@@ -21,7 +21,7 @@ import vm from 'node:vm';
 const SRC = readFileSync(new URL('../../public/checkin/js/snapshot.js', import.meta.url), 'utf8');
 const EXPORTS = ['readSnapshot', 'clearSnapshot', 'saveSnapshotPart', 'discardForeignSnapshot',
     'snapshotAppointment', 'upcomingSnapshotAppointments', 'snapshotResponseText',
-    'snapshotStamp', 'localIsoDate', 'dropSnapshotPart', 'historyFromList', 'renderSnapshotView'];
+    'snapshotStamp', 'localIsoDate', 'dropSnapshotPart', 'snapshotHasContent', 'historyFromList', 'renderSnapshotView'];
 
 /** Minimaler DOM-Ersatz: Elemente mit Kindern, Klassenselektoren '.x' durch Abstieg. */
 class FakeEl {
@@ -162,20 +162,54 @@ test('localIsoDate liefert das Ortsdatum', () => {
     assert.equal(api.localIsoDate(new Date(2026, 0, 5, 23, 59)), '2026-01-05');
 });
 
-test('dropSnapshotPart: ohne Token oder Schnappschuss passiert nichts', () => {
+test('dropSnapshotPart: ohne Token passiert nichts', () => {
     const a = load();
-    a.api.dropSnapshotPart('appointments');
+    a.api.dropSnapshotPart('appointments', 2);
     assert.equal(a.store.has('offline_snapshot'), false);
-    const b = load(TOKEN);
-    b.api.dropSnapshotPart('appointments');
-    assert.equal(b.store.has('offline_snapshot'), false);
+});
+
+test('dropSnapshotPart: ohne Schnappschuss entsteht ein Geruest mit Abschaltmarke', () => {
+    const { api } = load(TOKEN);
+    api.dropSnapshotPart('appointments', 2);
+    const snap = plain(api.readSnapshot());
+    assert.deepEqual(snap, { version: 1, member_id: 2, appointments: { off: true }, history: null });
+});
+
+test('dropSnapshotPart: Schnappschuss eines anderen Mitglieds wird ersetzt', () => {
+    const { api } = load(TOKEN);
+    api.saveSnapshotPart('history', [{ title: 'Alt' }], 3, {});
+    api.dropSnapshotPart('appointments', 2);
+    const snap = plain(api.readSnapshot());
+    assert.equal(snap.member_id, 2);
+    assert.equal(snap.history, null);
+    assert.deepEqual(snap.appointments, { off: true });
+});
+
+test('snapshotHasContent: nur Teile mit saved_at zaehlen', () => {
+    const { api } = load();
+    assert.equal(api.snapshotHasContent(null), false);
+    assert.equal(api.snapshotHasContent({ appointments: null, history: null }), false);
+    assert.equal(api.snapshotHasContent({ appointments: { off: true }, history: null }), false);
+    assert.equal(api.snapshotHasContent({ appointments: { off: true }, history: { saved_at: 'x', items: [] } }), true);
+});
+
+test('dropSnapshotPart: saved_at faellt auf den verbleibenden Teil zurueck', () => {
+    const { api } = load(TOKEN);
+    api.saveSnapshotPart('history', [], 2, {}, new Date('2026-10-08T09:00:00Z'));
+    api.saveSnapshotPart('appointments', [], 2, {}, new Date('2026-10-08T10:00:00Z'));
+    api.dropSnapshotPart('appointments', 2);
+    assert.equal(plain(api.readSnapshot()).saved_at, '2026-10-08T09:00:00.000Z');
+    api.dropSnapshotPart('history', 2);
+    const snap = plain(api.readSnapshot());
+    assert.equal(snap.saved_at, undefined);
+    assert.equal(api.snapshotHasContent(snap), false);
 });
 
 test('dropSnapshotPart setzt die Abschaltmarke, saved_at bleibt vom anderen Teil', () => {
     const { api } = load(TOKEN);
     api.saveSnapshotPart('appointments', [{ title: 'Probe' }], 2, {}, new Date('2026-10-08T10:00:00Z'));
     api.saveSnapshotPart('history', [], 2, {}, new Date('2026-10-08T09:00:00Z'));
-    api.dropSnapshotPart('appointments');
+    api.dropSnapshotPart('appointments', 2);
     const snap = plain(api.readSnapshot());
     assert.deepEqual(snap.appointments, { off: true });
     assert.equal(snap.history.saved_at, '2026-10-08T09:00:00.000Z');
@@ -186,10 +220,17 @@ test('dropSnapshotPart setzt die Abschaltmarke, saved_at bleibt vom anderen Teil
     assert.equal(again.saved_at, '2026-10-08T11:00:00.000Z');
 });
 
+test('saveSnapshotPart laesst eine Abschaltmarke des anderen Teils stehen', () => {
+    const { api } = load(TOKEN);
+    api.dropSnapshotPart('appointments', 2);
+    api.saveSnapshotPart('history', [{ title: 'Neu' }], 2, {});
+    assert.deepEqual(plain(api.readSnapshot()).appointments, { off: true });
+});
+
 test('dropSnapshotPart schluckt vollen Speicher', () => {
     const { api } = load({ ...TOKEN, offline_snapshot: JSON.stringify({ version: 1, member_id: 2, appointments: null, history: null }) },
         { throwOnSet: true });
-    assert.doesNotThrow(() => api.dropSnapshotPart('appointments'));
+    assert.doesNotThrow(() => api.dropSnapshotPart('appointments', 2));
 });
 
 test('snapshotAppointment uebernimmt die eigene Entschuldigung wie excuseChipHtml', () => {

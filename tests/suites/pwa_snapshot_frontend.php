@@ -101,6 +101,22 @@ test('Abgeschaltete Terminplanung entfernt den Teil appointments', function () u
         "startSession() muss bei abgeschalteter Terminplanung dropSnapshotPart('appointments') aufrufen");
 });
 
+test('Abgeschaltete Funktionen hinterlassen keinen Teil', function () use ($snapRepo) {
+    $js = str_replace("\r\n", "\n", sourceCode($snapRepo . '/public/checkin/js/app.js'));
+    assertTrue(str_contains(snapFunctionBody($js, 'applyPwaFeatureTabs'), "dropSnapshotPart('history'"),
+        "applyPwaFeatureTabs() muss beim Ausblenden des Verlauf-Tabs dropSnapshotPart('history', …) aufrufen");
+    assertTrue(str_contains(snapFunctionBody($js, 'startSession'), "dropSnapshotPart('appointments', "),
+        'dropSnapshotPart() braucht die member_id');
+    assertTrue(str_contains(snapFunctionBody($js, 'offerSnapshot'), 'snapshotHasContent('),
+        'offerSnapshot() darf nur einen Schnappschuss mit Inhalt anbieten');
+});
+
+test('Abmelden leert auch die gezeichnete Ansicht', function () use ($snapRepo) {
+    $js = str_replace("\r\n", "\n", sourceCode($snapRepo . '/public/checkin/js/app.js'));
+    assertTrue(str_contains(snapFunctionBody($js, 'forgetSavedLogin'), "getElementById('snapshotContent')?.replaceChildren()"),
+        'forgetSavedLogin() muss #snapshotContent leeren (geteilte Geraete)');
+});
+
 test('Nach "me" wird ein fremder Schnappschuss verworfen', function () use ($snapRepo) {
     $js = str_replace("\r\n", "\n", sourceCode($snapRepo . '/public/checkin/js/app.js'));
     assertTrue(str_contains(snapFunctionBody($js, 'startSession'), 'discardForeignSnapshot(meData.member_id)'),
