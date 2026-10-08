@@ -141,20 +141,31 @@ function watchForUpdate(reg) {
         showUpdateBanner(true);
     }
 
-    reg.addEventListener('updatefound', () => {
-        const worker = reg.installing;
-        if (!worker) return;
+    // Eine Installation, die beim Aufloesen von register() schon laeuft, hat
+    // ihr updatefound bereits ausgeloest und wuerde sonst uebersehen.
+    if (reg.installing) trackWorker(reg.installing);
 
-        worker.addEventListener('statechange', () => {
-            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-                showUpdateBanner(true);
-            }
-            // Hat der Worker ohne Knopf uebernommen (Umstieg vom
-            // Durchreich-Worker), gibt es nichts mehr anzubieten.
-            if (worker.state === 'activated' && !updateRequested) {
-                showUpdateBanner(false);
-            }
-        });
+    reg.addEventListener('updatefound', () => {
+        if (reg.installing) trackWorker(reg.installing);
+    });
+}
+
+function trackWorker(worker) {
+    worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+            showUpdateBanner(true);
+        }
+        // Hat der Worker ohne Knopf uebernommen (Umstieg vom
+        // Durchreich-Worker), gibt es nichts mehr anzubieten.
+        // Bekannte Grenze: Ein zweiter offener Tab, in dem niemand getippt
+        // hat, versteckt seine Leiste ebenfalls und laeuft mit dem alten
+        // Rahmen weiter, bis er neu geladen wird -- in einer installierten
+        // PWA selten, Folge nur eine verpasste Leiste. Bewusst so gelassen:
+        // Liesse man die Leiste stehen, bliebe sie beim Umstieg vom
+        // Durchreich-Worker grundlos sichtbar.
+        if (worker.state === 'activated' && !updateRequested) {
+            showUpdateBanner(false);
+        }
     });
 }
 
@@ -2473,7 +2484,7 @@ function tick() {
 document.addEventListener('visibilitychange', () => {
     // Die App bleibt oft tagelang offen; der Browser sucht dann selten von
     // selbst nach einem neuen Service Worker (OI-43).
-    if (!document.hidden) swRegistration?.update().catch(() => {});
+    if (!document.hidden) Promise.resolve(swRegistration?.update()).catch(() => {});
     if (!document.hidden && tickTimer) startTicker();
     // Offene Punkte beim Zurueckkehren nachladen (FI-17, Regel aus OI-67) --
     // nur, wenn der Erfassen-Tab gerade der sichtbare ist; sonst steht der
