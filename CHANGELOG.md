@@ -43,8 +43,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Registrierungen auf und ist nicht betroffen. Die Abschnitte zu `activate_user` und
   `user_status` in `API.md` beschrieben andere Felder (`is_active`, `role`) und sind nach dem Code
   neu geschrieben.
+- **Import-Dialog: Fehlermeldung als Text (OI-113):** Scheiterte ein CSV-Import (Mitglieder,
+  Termine, Anwesenheiten), wurde die Meldung des Servers ungeprüft als HTML in das Ergebnis
+  eingesetzt; sie wird jetzt maskiert. Gefunden vom Senken-Wächter
+  (`tests/suites/html_sinks_frontend.php`), der jetzt auch Werten folgt, die per `join()` oder
+  `+`-Verkettung zusammengesetzt werden.
 
 ## [1.22.1]
+
 
  – 2026-10-06
 

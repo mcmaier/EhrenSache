@@ -49,9 +49,9 @@ dieser Datei, die beim Bau einer Idee ohnehin auf dem Tisch liegen:
 | FI-2 Rest (je Person) | [OI-61](#oi-61--terminrückmeldung-einstellungen-der-terminart-wirken-rückwirkend-auf-die-zuverlässigkeit) | dieselbe Kennzahl, dieselbe Frage nach rückwirkenden Einstellungen |
 
 Offen mit Priorität *mittel*: OI-67, OI-98, OI-63 (nur noch die Spur), OI-6, OI-22, OI-23 (am
-2026-09-25 einzeln gegen den Code geprüft), dazu
+2026-09-25 einzeln gegen den Code geprüft);
 [OI-113](#oi-113--der-senken-wächter-folgt-join-nicht--fehlende-maskierung-bleibt-unbemerkt)
-(aufgenommen am 2026-09-28). OI-67 ist im Dashboard seit 1.19.0 entschärft (Cache-TTL zwei
+ist am 2026-10-08 erledigt (unveröffentlicht). OI-67 ist im Dashboard seit 1.19.0 entschärft (Cache-TTL zwei
 Minuten), in der Check-in-App unverändert. **OI-3 und OI-20 tragen ebenfalls *mittel*, stehen aber
 bewusst so** — sie halten eine in Kauf genommene Folge fest, keine Restarbeit, und gehören deshalb
 nicht in eine Umsetzungsreihe. OI-62 steht auf *niedrig–mittel*, OI-104 auf *niedrig*.
@@ -5586,8 +5586,23 @@ warten lässt.
 ---
 
 ### OI-113 · Der Senken-Wächter folgt `join()` nicht — fehlende Maskierung bleibt unbemerkt
-**Priorität:** mittel · aufgenommen am 2026-09-28 (bei der Umsetzung von
+**Priorität:** erledigt am 2026-10-08 — auf `dev`, unveröffentlicht · aufgenommen am 2026-09-28
+(bei der Umsetzung von
 [OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar))
+
+**Umgesetzt:** `hsValueParts()` zerlegt einen Ausdruck in die Werte, aus denen er einen String
+baut — Glieder einer `+`-Verkettung, Elemente eines Array-Literals vor `.join()` (auch hinter
+`.filter()`/`.map()`; ein `.map()` durch `escapeHtml` gilt als maskiert). `hsRawFieldsReaching()`
+behandelt diese Werte wie eine Einsetzung und folgt Bezeichnern darunter — damit auch einer
+Variablen, die ohne `${…}` direkt in einer Senke steht (`el.innerHTML = html`). Werkzeugtest mit
+beiden Formen, roh und maskiert. Der Fall aus OI-96 ist nachgestellt: `escapeHtml()` im
+`aria-label` der Kalenderblöcke entfernt → Wächter rot (zwei Felder, zwei Senken).
+
+**Die Zahl der bisher unsichtbaren Stellen:** eine Bauart an drei Stellen —
+`import_export.js`, die Fehlermeldung eines gescheiterten Imports (`result?.message`) im
+Import-Dialog, per `html +=` angehängt und per `innerHTML` gesetzt. Maskiert. Erreichbar nur im
+Import-Dialog eines Admins. Keine Ausnahme nötig. Verbleibende Grenzen stehen im Kopf der Suite
+(`push()`, Verkettung innerhalb eines Ternär-Zweigs).
 
 `tests/suites/html_sinks_frontend.php` verfolgt eine Variable nur, wenn **ihre eigene Definition**
 eine Template-Einsetzung `${…}` enthält. Entsteht ihr Wert anders, sieht der Wächter nichts:

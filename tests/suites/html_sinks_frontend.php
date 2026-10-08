@@ -35,11 +35,15 @@ declare(strict_types=1);
  * dort CSS steht und nicht HTML.
  *
  * Grenzen, bewusst:
- * - Nur Template-Interpolationen ${…} werden als roh erkannt, nicht
- *   String-Verkettung mit + und nicht Array.join(). Eine Variable wird nur
- *   verfolgt, wenn ihre eigene Definition ein ${…} enthaelt; bei
- *   [a, b].join(', ') bleibt sie unsichtbar, und eine fehlende Maskierung
- *   faellt nicht auf. Belegt am 2026-09-28 (OI-113).
+ * - Roh erkannt werden Template-Interpolationen ${…} und seit OI-113
+ *   (2026-10-08) auch die Glieder einer +-Verkettung und die Elemente eines
+ *   Array-Literals vor .join(…) (auch hinter .filter/.map), siehe
+ *   hsValueParts(). Bis dahin blieb [a, b].join(', ') unsichtbar -- belegt am
+ *   2026-09-28. Nicht gefolgt wird Arrays, die per push() wachsen, und
+ *   Verkettungen innerhalb eines Ternaer-Zweigs (cond ? a + b : c).
+ * - hsDefinitions() sucht im Rumpf der umgebenden Funktion, nicht im Block:
+ *   Zwei "let html" in getrennten Zweigen gelten als eine Variable. Das
+ *   meldet eher zu viel als zu wenig.
  * - Variablen werden innerhalb derselben Datei aufgeloest, nicht ueber
  *   Funktionsparameter hinweg.
  * - hsDefinitions() kennt const/let/var und Zuweisung, nicht
@@ -417,18 +421,162 @@ function hsDefinitions(string $js, string $name, int $before): array
 }
 
 /**
+ * Teilt $expr an jedem $sep auf Tiefe 0 (ausserhalb von Klammern,
+ * Zeichenketten, Regex- und Template-Literalen). Fuer '+' werden ++ und +=
+ * nicht als Trenner gewertet.
+ *
+ * @return string[]
+ */
+function hsSplitTopLevel(string $expr, string $sep): array
+{
+    $parts = [];
+    $n     = strlen($expr);
+    $depth = 0;
+    $from  = 0;
+    for ($i = 0; $i < $n; $i++) {
+        $c = $expr[$i];
+        if (jsRegexStart($expr, $i)) {
+            $i = jsRegexEnd($expr, $i);
+        } elseif ($c === '"' || $c === "'") {
+            $i++;
+            while ($i < $n && $expr[$i] !== $c) {
+                $i += $expr[$i] === '\\' ? 2 : 1;
+            }
+        } elseif ($c === '`') {
+            $i = hsTemplateEnd($expr, $i);
+        } elseif ($c === '(' || $c === '[' || $c === '{') {
+            $depth++;
+        } elseif ($c === ')' || $c === ']' || $c === '}') {
+            $depth--;
+        } elseif ($depth === 0 && $c === $sep) {
+            if ($sep === '+' && (($expr[$i + 1] ?? '') === '+' || ($expr[$i + 1] ?? '') === '='
+                || ($expr[$i - 1] ?? '') === '+')) {
+                continue;
+            }
+            $parts[] = substr($expr, $from, $i - $from);
+            $from    = $i + 1;
+        }
+    }
+    $parts[] = substr($expr, $from);
+
+    return $parts;
+}
+
+/**
+ * Die Einzelwerte, aus denen ein Ausdruck einen String zusammensetzt (OI-113):
+ * die Glieder einer +-Verkettung und die Elemente eines Array-Literals --
+ * auch hinter .filter(…)/.map(…) und vor .join(…). Ein Array in ${…} wird
+ * ebenfalls mit Kommas zu Text, deshalb zaehlt das blosse Literal mit.
+ * Ein Bezeichner mit .join(…) wird als Bezeichner geliefert, damit der
+ * Aufrufer seiner Definition folgt.
+ *
+ * Laeuft ein .map(…) durch escapeHtml, gilt das ganze Array als maskiert.
+ * Template-Literale bleiben ein Wert: Ihre ${…} sammelt hsInterpolations().
+ *
+ * @return string[]
+ */
+function hsValueParts(string $expr, int $depth = 0): array
+{
+    $e = trim($expr);
+    if ($e === '' || $depth > 8) {
+        return [];
+    }
+
+    // Aeussere Klammern: (a + b)
+    if ($e[0] === '(' && hsExpressionEnd($e, 1) === strlen($e) - 1) {
+        return hsValueParts(substr($e, 1, -1), $depth + 1);
+    }
+
+    $glieder = hsSplitTopLevel($e, '+');
+    if (count($glieder) > 1) {
+        $out = [];
+        foreach ($glieder as $g) {
+            $out = array_merge($out, hsValueParts($g, $depth + 1));
+        }
+
+        return $out;
+    }
+
+    // Empfaenger: Array-Literal oder Bezeichner, dahinter eine Aufrufkette
+    if ($e[0] === '[') {
+        $close    = hsExpressionEnd($e, 1);
+        $receiver = substr($e, 1, $close - 1);
+        $rest     = substr($e, $close + 1);
+        $isArray  = true;
+    } elseif (preg_match('/^[A-Za-z_$][\w$]*/', $e, $m) === 1 && $m[0] !== $e) {
+        $receiver = $m[0];
+        $rest     = substr($e, strlen($m[0]));
+        $isArray  = false;
+    } else {
+        return [$e];
+    }
+
+    $methods = [];
+    while (trim($rest) !== '') {
+        if (preg_match('/^\s*\.\s*(\w+)\s*\(/', $rest, $m) !== 1) {
+            return [$e];   // Eigenschaft, Index o. Ae. -- kein zusammengesetzter String
+        }
+        $argStart  = strlen($m[0]);
+        $argEnd    = hsExpressionEnd($rest, $argStart);
+        $methods[] = [$m[1], substr($rest, $argStart, $argEnd - $argStart)];
+        $rest      = substr($rest, $argEnd + 1);
+    }
+
+    $names = array_column($methods, 0);
+    $joins = $names !== [] && end($names) === 'join';
+    foreach (array_slice($names, 0, -1) as $name) {
+        if ($name !== 'filter' && $name !== 'map') {
+            $joins = false;
+        }
+    }
+    if (!$joins && !($isArray && $methods === [])) {
+        return [$e];
+    }
+    foreach ($methods as [$name, $arg]) {
+        if ($name === 'map' && str_contains($arg, 'escapeHtml')) {
+            return [];
+        }
+    }
+    if (!$isArray) {
+        return [$receiver];
+    }
+
+    $out = [];
+    foreach (hsSplitTopLevel($receiver, ',') as $element) {
+        $out = array_merge($out, hsValueParts($element, $depth + 1));
+    }
+
+    return $out;
+}
+
+/**
  * Rohe Freitextfelder, die einen Ausdruck erreichen — direkt oder ueber
  * interpolierte Variablen, deren Definitionen rekursiv mitgeprueft werden.
+ *
+ * Seit OI-113 auch ueber +-Verkettung und join(): Die Einzelwerte aus
+ * hsValueParts() -- des Ausdrucks selbst und jeder ${…} darin -- werden wie
+ * eine Einsetzung behandelt, ein Bezeichner darunter wird verfolgt.
  */
 function hsRawFieldsReaching(string $js, string $expr, int $at, array $seen = []): array
 {
-    $raw = [];
+    $raw   = [];
+    $parts = hsValueParts($expr);
     foreach (hsInterpolations($expr) as $content) {
         if (hsIsRawField($content)) {
             $raw[] = trim($content);
         }
+        $parts = array_merge($parts, hsValueParts($content));
     }
-    foreach (hsInterpolatedIdentifiers($expr) as $id) {
+    $ids = hsInterpolatedIdentifiers($expr);
+    foreach ($parts as $part) {
+        if (hsIsRawField($part)) {
+            $raw[] = trim($part);
+        } elseif (preg_match('/^[A-Za-z_$][\w$]*$/', $part) === 1) {
+            $ids[] = $part;
+        }
+    }
+    $raw = array_values(array_unique($raw));
+    foreach (array_unique($ids) as $id) {
         if (isset($seen[$id]) || count($seen) > 6) {
             continue;
         }
@@ -622,6 +770,58 @@ JS;
         '4: user.member_number (ueber nr) (ueber info)',
         '5: apt.title',
         "6: res.message || res.hint || 'Fehler'",
+    ], $funde);
+});
+
+test('Werkzeug: folgt join() und +-Verkettung, Maskierung davor oder darin wird erkannt (OI-113)', function () {
+    // Zeile 3 ist der Fall aus OI-113 (Kalender, Tastaturzugang): der Name aus
+    // join() landet ohne escapeHtml() im aria-label. Zeile 5 dasselbe mit +,
+    // Zeile 7 direkt in der Senke, Zeile 9 ueber ein Array in einer Variablen
+    // und Zeile 11 ein + innerhalb einer Einsetzung. Zeile 13 folgt ueber
+    // zwei Stufen (prefix -> label). Die maskierten Zeilen 14 bis 20 fehlen
+    // zu Recht: escapeHtml an der Senke, im map() vor dem join(), um die
+    // ganze Verkettung, an jedem Glied, und reine Zahlen.
+    $js = <<<'JS'
+function render(apt, zeit, m, rows) {
+    const name = [apt.type_name, zeit, apt.title].filter(Boolean).join(', ');
+    a.innerHTML = `<button aria-label="${name}">x</button>`;
+    const label = apt.title + ' (' + zeit + ')';
+    b.innerHTML = `<span>${label}</span>`;
+    c.innerHTML = '<b>' + m.surname + '</b>';
+    const teile = [m.name, m.surname];
+    const voll = teile.join(' ');
+    d.innerHTML = `<i>${voll}</i>`;
+    e.innerHTML = `<i>${m.member_number + ': ' + zeit}</i>`;
+    const prefix = m.group_name + ' / ';
+    const titel = prefix + zeit;
+    f.innerHTML = `<i>${titel}</i>`;
+    const ok1 = [apt.type_name, apt.title].filter(Boolean).join(', ');
+    g.innerHTML = `<i aria-label="${escapeHtml(ok1)}">x</i>`;
+    const ok2 = [apt.type_name, apt.title].map(escapeHtml).join(', ');
+    h.innerHTML = `<i>${ok2}</i>`;
+    i.innerHTML = '<b>' + escapeHtml(m.name + ' ' + m.surname) + '</b>';
+    j.innerHTML = `<i>${escapeHtml(apt.title) + ' / ' + escapeHtml(m.name)}</i>`;
+    k.innerHTML = `<i>${rows.length + 1}</i>`;
+}
+JS;
+    $funde = [];
+    foreach (hsSinks($js) as [$line, $expr, $at]) {
+        foreach (hsRawFieldsReaching($js, $expr, $at) as $f) {
+            $funde[] = "{$line}: {$f}";
+        }
+    }
+    $funde = array_values(array_unique($funde));
+    sort($funde);
+
+    assertSame([
+        '10: m.member_number',
+        '13: m.group_name (ueber prefix) (ueber titel)',
+        '3: apt.title (ueber name)',
+        '3: apt.type_name (ueber name)',
+        '5: apt.title (ueber label)',
+        '6: m.surname',
+        '9: m.name (ueber teile) (ueber voll)',
+        '9: m.surname (ueber teile) (ueber voll)',
     ], $funde);
 });
 

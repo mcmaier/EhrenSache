@@ -270,7 +270,7 @@ function displayImportResult(result, nameLookup) {
     if (!result || !result.success) {
         let html = '<div class="import-error">';
         html += `✗ Import fehlgeschlagen<br>`;
-        html += result?.message || 'Unbekannter Fehler';
+        html += escapeHtml(result?.message || 'Unbekannter Fehler');
         html += '</div>';
         contentDiv.innerHTML = html;
         resultDiv.style.display = 'block';
@@ -476,7 +476,7 @@ function displayRecordsImportResult(result) {
     if (!result || !result.success) {
         let html = '<div class="import-error">';
         html += `✗ Import fehlgeschlagen<br>`;
-        html += result?.message || 'Unbekannter Fehler';
+        html += escapeHtml(result?.message || 'Unbekannter Fehler');
         html += '</div>';
         contentDiv.innerHTML = html;
         resultDiv.style.display = 'block';
@@ -791,7 +791,7 @@ function displayAppointmentsImportResult(result) {
     if (!result || !result.success) {
         let html = '<div class="import-error">';
         html += `✗ Import fehlgeschlagen<br>`;
-        html += result?.message || 'Unbekannter Fehler';
+        html += escapeHtml(result?.message || 'Unbekannter Fehler');
         html += '</div>';
         contentDiv.innerHTML = html;
         resultDiv.style.display = 'block';
