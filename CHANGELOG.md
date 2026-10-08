@@ -9,7 +9,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
-### Hinzugefügt
+## [1.23.0] – 2026-10-08
+
+### Neu
 
 - **Offene Anträge in der Check-in-App (FI-24):** Verwalter schalten im Tab „Liste“ auf „Offene
   Anträge“ um und entscheiden Entschuldigungen und Zeitanträge zu allen Terminen, auch außerhalb
@@ -26,7 +28,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Link jederzeit ersetzbar oder widerrufbar; gespeichert wird nur ein Hash.
   **Standardmäßig aus** (Systemeinstellungen → Termine & Anwesenheit). Neue Ressourcen
   `calendar_feed` und `calendar` (API.md). **Braucht die Tabelle `calendar_feeds`** — der
-  Migrationsschritt kommt mit dem Release. In der öffentlichen Demo lassen sich keine Abo-Links
+  Migrationsschritt legt sie an. In der öffentlichen Demo lassen sich keine Abo-Links
   erzeugen, der Feed antwortet dort immer mit 404.
 - **Die Check-in-App öffnet auch ohne Verbindung.** Ihr Service Worker hält den App-Rahmen vor,
   statt jede Anfrage nur durchzureichen. Ohne Netz erscheint mit gespeicherter Anmeldung der

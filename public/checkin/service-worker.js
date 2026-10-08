@@ -26,7 +26,7 @@
 // Dashboard zeigten; cache.addAll() scheiterte, und die Zwischenspeicherung
 // wurde abgeschaltet (ffe4690).
 
-const VERSION = '1.22.2';
+const VERSION = '1.23.0';
 const CACHE_PREFIX = 'checkin-';
 const CACHE_NAME = CACHE_PREFIX + VERSION;
 

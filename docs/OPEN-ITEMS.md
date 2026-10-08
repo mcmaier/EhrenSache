@@ -7,7 +7,7 @@ oder noch nicht gebaut.
 **Zuletzt geprüft:** 2026-09-28 gegen `v1.17.1` (`8d77479`), Eintrag für Eintrag gegen Code und git ·
 **Status nachgezogen:** 2026-10-01 gegen `v1.19.0` (`d672b8d`) — nur Veröffentlichungsvermerke und
 Kopfzeilen gegen git, **nicht** Eintrag für Eintrag gegen den Code ·
-**Version:** 1.22.2
+**Version:** 1.23.0
 
 > **Diese Angabe ist Teil der Pflege, nicht Zierde.** Am 2026-09-17 stand hier noch 1.7.0,
 > während der Code auf 1.9.0 war — fünf Punkte waren längst behoben, ohne dass ihr Eintrag es
@@ -628,7 +628,7 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
 ---
 
 ### OI-43 · Offline-Betrieb der Check-in-PWA
-**Priorität:** niedrig · **Richtung entschieden am 2026-10-08:** Rahmen ja, Lesestand begrenzt, Schreiben nein · **Stufe 1 und 2 gebaut** (2026-10-08, unveröffentlicht)
+**Priorität:** niedrig · **Richtung entschieden am 2026-10-08:** Rahmen ja, Lesestand begrenzt, Schreiben nein · **Stufe 1 und 2 veröffentlicht mit 1.23.0** (2026-10-08)
 
 Bis zu Stufe 1 (2026-10-08) hatte die Check-in-PWA **keinen Cache**: Ihr Service Worker reichte
 jede Anfrage ans Netz durch und diente allein der Installierbarkeit auf dem Startbildschirm; ohne
@@ -877,7 +877,7 @@ und der Zeiterfassungsregel.
 ---
 
 ### OI-123 · Check-in-App: „Termin anlegen“ fehlt in der Stufe „nur Terminplanung“
-**Priorität:** erledigt am 2026-10-06 — in dev (`dca87d1`), geht mit dem nächsten Release mit.
+**Priorität:** erledigt am 2026-10-06 — veröffentlicht mit 1.22.0 (`dca87d1`).
 Plus-Knopf im Tab „Termine“ wie unten entschieden, alle vier Punkte umgesetzt; die Meldung nennt
 zusätzlich den Acht-Wochen-Horizont der Infotermine. Nebenbei behoben: Die Dialoge der App rollen
 auf kurzen Displays selbst, die Seite dahinter steht still. · aufgenommen am 2026-10-06 (Rest aus
@@ -970,7 +970,7 @@ die Rückmeldungen zurückgesetzt werden sollen.
 **Nicht sicherheitsrelevant.**
 
 ### OI-125 · Check-in-App: kommende Termine bearbeiten und löschen
-**Priorität:** erledigt am 2026-10-06 — in dev (`f39d7a8`), geht mit dem nächsten Release mit.
+**Priorität:** erledigt am 2026-10-06 — veröffentlicht mit 1.22.0 (`f39d7a8`).
 Umgesetzt wie unten entschieden; neu in der API `GET appointments?id=X&dependents=1`. Bewusst offen:
 Nach einer Terminverlegung nennt der Tab „Termine“ die Zahl zurückgesetzter Rückmeldungen nicht
 (die Anwesenheitsliste schon). · aufgenommen am 2026-10-06 (Folge aus
@@ -2670,7 +2670,7 @@ Verwandt: [OI-120](#oi-120--das-dashboard-lädt-rund-45-einzeldateien) (Dateien,
 ---
 
 ### OI-126 · API sendet `Access-Control-Allow-Origin: *` zusammen mit `Allow-Credentials: true`
-**Priorität:** erledigt am 2026-10-08 — auf `dev`, unveröffentlicht · aufgenommen am 2026-10-06
+**Priorität:** erledigt mit 1.23.0 (2026-10-08) · aufgenommen am 2026-10-06
 (Messung auf der Demo nach dem Update auf 1.22.0)
 
 **Umgesetzt:** Kein Aufrufer braucht CORS (Dashboard, Check-in-App und Station auf demselben
@@ -2705,7 +2705,7 @@ Der Kalender-Feed (FI-8, Ressource `calendar`) sendet bereits keine CORS-Header;
 ---
 
 ### OI-127 · `activate_user` und `user_status` sind in API.md falsch beschrieben
-**Priorität:** erledigt am 2026-10-08 — auf `dev`, unveröffentlicht · aufgenommen am 2026-10-07
+**Priorität:** erledigt mit 1.23.0 (2026-10-08) · aufgenommen am 2026-10-07
 (Fund beim Bau des Gerätesimulators im IoT-Repo)
 
 **Umgesetzt wie vorgeschlagen:** Beide Abschnitte in `API.md` sind nach dem Code neu geschrieben
@@ -2754,7 +2754,7 @@ Request-Felder dieser beiden Ressourcen mit abdecken kann, dabei prüfen.
 ---
 
 ### OI-128 · Migrationsschritt für `calendar_feeds` fehlt
-**Priorität:** hoch · aufgenommen am 2026-10-07 (Zweig `feat/fi-8-ics-abo`, Spec
+**Priorität:** erledigt mit 1.23.0 (2026-10-08, `private/migrations/1.22.2.php`, Demo-Rücksetzung leert `calendar_feeds`) · aufgenommen am 2026-10-07 (Zweig `feat/fi-8-ics-abo`, Spec
 `2026-10-07-kalender-abo-design.md`)
 
 Das Kalender-Abo (FI-8) braucht die Tabelle `calendar_feeds`. `private/setup/ehrensache_db.sql`
@@ -5657,7 +5657,7 @@ warten lässt.
 ---
 
 ### OI-113 · Der Senken-Wächter folgt `join()` nicht — fehlende Maskierung bleibt unbemerkt
-**Priorität:** erledigt am 2026-10-08 — auf `dev`, unveröffentlicht · aufgenommen am 2026-09-28
+**Priorität:** erledigt mit 1.23.0 (2026-10-08) · aufgenommen am 2026-09-28
 (bei der Umsetzung von
 [OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar))
 

@@ -628,7 +628,7 @@ FI-8 zusammen kommen oder warten, bis ein Verein danach fragt.
 ### FI-8 · Kalender-Abo (ICS-Feed)
 **Nutzen:** mittel · **Aufwand:** S — Voraussetzung [FI-23](#fi-23--ort-und-ende-am-termin) **seit 1.10.0 erfüllt**
 
-**Umgesetzt (unveröffentlicht)** — Spec `docs/superpowers/specs/2026-10-07-kalender-abo-design.md`.
+**Umgesetzt in 1.23.0** — Spec `docs/superpowers/specs/2026-10-07-kalender-abo-design.md`.
 Entschieden: eigenes Token (nur Hash gespeichert), Termine der eigenen Gruppen für jede Rolle,
 eigene Rückmeldung im Titel, abgesagte standardmäßig ausgeblendet, Europe/Berlin mit VTIMEZONE,
 Einzeltermine statt RRULE, Funktion standardmäßig aus.
@@ -771,7 +771,7 @@ soll.
 ### FI-24 · Freigaben in der Check-in-App
 **Nutzen:** mittel · **Aufwand:** M
 
-**Umgesetzt (unveröffentlicht)** — Spec `docs/superpowers/specs/2026-10-08-fi-24-freigaben-pwa-design.md`.
+**Umgesetzt in 1.23.0** — Spec `docs/superpowers/specs/2026-10-08-fi-24-freigaben-pwa-design.md`.
 Entschieden: kein sechster Tab, sondern ein Umschalter „Anwesenheit | Offene Anträge (n)“ im Tab
 „Liste“; Entschuldigungen und Zeitanträge (Arbeitszeiten bleiben im Dashboard); alle offenen
 Anträge, geteilt in „Kommende“ und „Vergangene Termine“; keine Gruppengrenze für Manager (FI-15
@@ -1205,7 +1205,7 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
 4. **FI-6 Benachrichtigungen** — erst jetzt, und erst nachdem die Auslöserfrage beantwortet ist.
    Danach wird alles Vorherige wirksamer, FI-1 am deutlichsten. Die Einmal-Links aus der Mail
    gehören in dieselbe Runde, weil sie dieselbe Sicherheitsprüfung brauchen.
-5. ~~**FI-23 Ort und Ende**~~ (umgesetzt in 1.10.0), dann ~~**FI-8 ICS-Abo**~~ (umgesetzt, unveröffentlicht) — in dieser Reihenfolge. FI-8 ist weiterhin
+5. ~~**FI-23 Ort und Ende**~~ (umgesetzt in 1.10.0), dann ~~**FI-8 ICS-Abo**~~ (umgesetzt in 1.23.0) — in dieser Reihenfolge. FI-8 ist weiterhin
    die günstigste Idee der Liste, aber ein Feed ohne Ort und ohne Dauer ist eine Liste von
    Titeln; die zwei Felder davor gebaut, macht aus derselben Arbeit einen brauchbaren Kalender.
    FI-23 nützt außerdem für sich allein und hebt nebenbei FI-19. Nach FI-7 wird FI-8 noch

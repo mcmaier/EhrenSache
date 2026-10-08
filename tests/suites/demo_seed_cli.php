@@ -117,8 +117,15 @@ test('assertSchema wirft bei 1.20.2 (member_group_history fehlt)', function () {
     assertThrows(fn () => assertSchema($db, 'test_'));
 });
 
+test('assertSchema wirft bei 1.22.2 (calendar_feeds fehlt)', function () {
+    // Seit 1.23.0 leert der Generator calendar_feeds; auf 1.22.2 fehlt die
+    // Tabelle.
+    $db = demoSeedCliMakeSchemaDb(['1.22.2']);
+    assertThrows(fn () => assertSchema($db, 'test_'));
+});
+
 test('assertSchema laesst einen Patchstand ueber dem Mindeststand durch', function () {
-    $db = demoSeedCliMakeSchemaDb(['1.21.1']);
+    $db = demoSeedCliMakeSchemaDb(['1.23.1']);
     assertSchema($db, 'test_');
 });
 
@@ -464,6 +471,15 @@ test('DEMO_TABLES leert member_group_history vor member_groups', function () {
     assertTrue($pos !== false, 'member_group_history fehlt in DEMO_TABLES');
     assertTrue($pos < array_search('member_groups', DEMO_TABLES, true));
     assertTrue($pos < array_search('members', DEMO_TABLES, true));
+});
+
+// FI-8: clearAll() schaltet die Fremdschluesselpruefung ab, ON DELETE CASCADE
+// greift dort nicht -- ein Abo-Link ueberlebte sonst die Ruecksetzung und gaelte
+// fuer das neu angelegte Konto mit derselben user_id (OI-128).
+test('DEMO_TABLES leert calendar_feeds vor users', function () {
+    $pos = array_search('calendar_feeds', DEMO_TABLES, true);
+    assertTrue($pos !== false, 'calendar_feeds fehlt in DEMO_TABLES');
+    assertTrue($pos < array_search('users', DEMO_TABLES, true));
 });
 
 test('writePlan schreibt subgroup_parents aus dem Plan', function () {
