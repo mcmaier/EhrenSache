@@ -128,7 +128,7 @@ test('snapshotAppointment bildet Rueckmeldung und Info-Termine ab', () => {
     const base = { date: '2026-10-17 00:00:00', start_time: '19:00:00', end_time: '21:00:00',
         title: 'Probe', location: 'Saal' };
     assert.deepEqual(plain(api.snapshotAppointment({ appointment: { ...base, responses_enabled: 1 }, own: { status: 'yes' } })),
-        { date: '2026-10-17', start_time: '19:00:00', end_time: '21:00:00', title: 'Probe', location: 'Saal', response: 'yes' });
+        { date: '2026-10-17', start_time: '19:00:00', end_time: '21:00:00', title: 'Probe', location: 'Saal', response: 'yes', absence: '' });
     assert.equal(api.snapshotAppointment({ appointment: { ...base, responses_enabled: 1 }, own: null }).response, null);
     assert.equal(api.snapshotAppointment({ appointment: { ...base, responses_enabled: 0 } }).response, 'info');
 });

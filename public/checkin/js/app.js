@@ -1222,6 +1222,12 @@ function forgetSavedLogin() {
     clearSnapshot();
 }
 
+/** Termine-Teil des letzten Stands aus dem gerade gehaltenen Stand (OI-43). */
+function saveAppointmentsSnapshot() {
+    saveSnapshotPart('appointments', upcomingResponses.map(snapshotAppointment),
+        userData?.member_id, snapshotHeader());
+}
+
 /** Kopf des Schnappschusses: Verein und Mitglied, wie gerade angezeigt. */
 function snapshotHeader() {
     return {
@@ -1251,6 +1257,11 @@ async function startSession(meData) {
 
     const generation = sessionGeneration;
     userData = meData;
+
+    // Ohne Terminplanung laedt loadResponses() nie: Ein alter Stand bliebe
+    // sonst stehen. pwaFeatureOn() liest userData.features aus "me" und ist
+    // deshalb schon hier gueltig.
+    if (!pwaFeatureOn('appointments')) dropSnapshotPart('appointments');
 
     // Stufe 2: was die Erfassen-Ansicht braucht. Keiner der Abrufe haengt von
     // einem anderen ab; member_id kommt aus me.
@@ -3423,8 +3434,16 @@ function openSnapshotView() {
         showStartStatus('Kein letzter Stand vorhanden.', true);
         return;
     }
-    renderSnapshotView(document.getElementById('snapshotContent'),
-        document.getElementById('snapshotStamp'), snap, new Date());
+    try {
+        renderSnapshotView(document.getElementById('snapshotContent'),
+            document.getElementById('snapshotStamp'), snap, new Date());
+    } catch (error) {
+        // Beschaedigter Schnappschuss: verwerfen, sonst bote der Knopf ihn immer wieder an.
+        debug.error('Letzter Stand nicht darstellbar:', error);
+        clearSnapshot();
+        showStartStatus('Kein letzter Stand vorhanden.', true);
+        return;
+    }
     showScreen('snapshot');
 }
 
@@ -3493,10 +3512,19 @@ function isOpenHistoryEntry(entry) {
 
 // Lädt History beim Login
 async function loadHistory() {
+    // Mitglied und Sitzung merken: Wechselt das Konto, waehrend Abrufe laufen,
+    // darf der Verlauf weder angezeigt noch unter dem neuen Mitglied
+    // gespeichert werden (OI-43).
+    const generation = sessionGeneration;
+    const memberId = userData?.member_id;
+    if (!memberId) return;
 
     try {
         // Die Farben haengen an den Terminarten aus Stufe 3 des Starts (OI-121).
-        if (appointmentTypesLoad) await appointmentTypesLoad;
+        if (appointmentTypesLoad) {
+            await appointmentTypesLoad;
+            if (generation !== sessionGeneration) return;
+        }
 
         // Anwesenheiten und Antraege nur mit eingeschalteter Anwesenheit
         // (OI-62, Etappe 2) -- sonst antwortet der Server 403.
@@ -3504,14 +3532,16 @@ async function loadHistory() {
         let exceptions = [];
         if (pwaFeatureOn('attendance')) {
             // Lade letzte 10 Records
-            let result = await apiCall('records','GET',null,{ member_id: userData.member_id });
+            let result = await apiCall('records','GET',null,{ member_id: memberId });
+            if (generation !== sessionGeneration) return;
             if (!result.success) {
                 throw new Error(result.error);
             }
             records = result.data;
         
             // Lade offene Exceptions
-            result = await apiCall('exceptions', 'GET', null, { member_id: userData.member_id,status: 'pending' });
+            result = await apiCall('exceptions', 'GET', null, { member_id: memberId,status: 'pending' });
+            if (generation !== sessionGeneration) return;
              if (!result.success) {
                 throw new Error(result.error);
             }
@@ -3522,8 +3552,9 @@ async function loadHistory() {
             // „Offene Punkte" springt hierher, und ohne sie liefe der Sprung ins
             // Leere. Dasselbe Fenster wie serverseitig OPEN_ITEMS_REJECTED_DAYS.
             const rejected = await apiCall('exceptions', 'GET', null, {
-                member_id: userData.member_id, status: 'rejected'
+                member_id: memberId, status: 'rejected'
             });
+            if (generation !== sessionGeneration) return;
             if (rejected.success && Array.isArray(rejected.data)) {
                 const grenze = Date.now() - 14 * 24 * 60 * 60 * 1000;
                 exceptions = exceptions.concat(rejected.data.filter(e =>
@@ -3540,10 +3571,11 @@ async function loadHistory() {
         // gewollt, hier falsch. Der Verlauf ist die persoenliche Zeitachse
         // dieses Mitglieds, genau wie records und exceptions darueber.
         let sessions = [];
-        if (worktimeActivities.length > 0 && userData.member_id) {
+        if (worktimeActivities.length > 0) {
             const ws = await apiCall('work_sessions', 'GET', null, {
-                member_id: userData.member_id
+                member_id: memberId
             });
+            if (generation !== sessionGeneration) return;
             if (ws.success && Array.isArray(ws.data)) {
                 sessions = ws.data;
             }
@@ -3606,7 +3638,7 @@ async function loadHistory() {
         renderHistory(toRender);
         // Gelesen wird die angezeigte Liste: dieselben Beschriftungen wie im Tab.
         saveSnapshotPart('history', historyFromList(elements.historyList),
-            userData?.member_id, snapshotHeader());
+            memberId, snapshotHeader());
         
     } catch (error) {
         debug.error('Fehler beim Laden der History:', error);
@@ -5408,8 +5440,7 @@ async function loadResponses() {
 
     updateResponsesBadge();
     renderResponses(null, drafts);
-    saveSnapshotPart('appointments', upcomingResponses.map(snapshotAppointment),
-        userData?.member_id, snapshotHeader());
+    saveAppointmentsSnapshot();
     return true;
 }
 
@@ -6168,6 +6199,7 @@ async function submitResponse(item, status, comment, card) {
 
         updateResponsesBadge();
         renderResponses(key);
+        saveAppointmentsSnapshot();
         showMessage('Rückmeldung gespeichert', 'success');
     } finally {
         // Bei Fehler bleibt die alte Karte stehen und wird hier freigegeben;

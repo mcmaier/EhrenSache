@@ -26,6 +26,13 @@
 const SNAPSHOT_KEY = 'offline_snapshot';
 const SNAPSHOT_VERSION = 1;
 const SNAPSHOT_RESPONSE_TEXT = { yes: 'Zugesagt', no: 'Abgesagt', maybe: 'Unsicher' };
+// Stand der eigenen Entschuldigung, Texte wie excuseChipHtml() in app.js
+// (snapshot.js wird vor app.js geladen und kennt sie nicht).
+const SNAPSHOT_ABSENCE_TEXT = {
+    pending: '⏳ Entschuldigung beantragt',
+    approved: '✗ entschuldigt',
+    rejected: 'Entschuldigung abgelehnt'
+};
 // Ab diesem Abstand nennt die Ansicht je Abschnitt seinen eigenen Stand.
 const SNAPSHOT_PART_GAP_MS = 60 * 60 * 1000;
 
@@ -73,6 +80,23 @@ function saveSnapshotPart(part, items, memberId, header, now = new Date()) {
     }
 }
 
+/**
+ * Markiert einen Teil als abgeschaltet (Funktion im Verein ausgeschaltet): Die
+ * Ansicht blendet ihn aus, statt "Nicht geladen" zu melden oder einen alten
+ * Stand zu zeigen. Nur mit Schnappschuss und gespeichertem Token.
+ */
+function dropSnapshotPart(part) {
+    try {
+        if (!localStorage.getItem('api_token')) return;
+        const snap = readSnapshot();
+        if (!snap) return;
+        snap[part] = { off: true };
+        localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap));
+    } catch (error) {
+        // wie saveSnapshotPart()
+    }
+}
+
 /** Nach erfolgreichem "me": einen Schnappschuss eines anderen Mitglieds verwerfen. */
 function discardForeignSnapshot(memberId) {
     const snap = readSnapshot();
@@ -91,7 +115,9 @@ function snapshotAppointment(item) {
         title: apt.title || '',
         location: apt.location || '',
         // 'info': Termin ohne Rueckmeldung -- dort gibt es nichts anzuzeigen.
-        response: apt.responses_enabled ? (item.own ? item.own.status : null) : 'info'
+        response: apt.responses_enabled ? (item.own ? item.own.status : null) : 'info',
+        // Wie excuseChipHtml(): Antrag vor "hat begonnen".
+        absence: SNAPSHOT_ABSENCE_TEXT[item.own_absence?.status] || (item.started ? 'hat begonnen' : '')
     };
 }
 
@@ -174,6 +200,11 @@ function snapshotEntry(title, lines) {
     return entry;
 }
 
+/** Eintraege eines Teils; ein beschaedigter Wert zaehlt als leer. */
+function snapshotItems(part) {
+    return part && Array.isArray(part.items) ? part.items : [];
+}
+
 /** Baut die Leseansicht in root auf; stampEl ist die Leiste oben. */
 function renderSnapshotView(root, stampEl, snap, now = new Date()) {
     stampEl.textContent = `Stand von ${snapshotStamp(snap.saved_at)} – ohne Verbindung`;
@@ -185,24 +216,30 @@ function renderSnapshotView(root, stampEl, snap, now = new Date()) {
     if (header.member) head.appendChild(snapshotEl('p', '', header.member));
     root.appendChild(head);
 
-    const apts = snap.appointments;
-    const hist = snap.history;
+    // { off: true }: Funktion abgeschaltet -- kein Abschnitt, kein Stand.
+    const apts = snap.appointments && snap.appointments.off ? undefined : snap.appointments;
+    const hist = snap.history && snap.history.off ? undefined : snap.history;
     const showStamps = !!(apts && hist)
         && Math.abs(new Date(apts.saved_at) - new Date(hist.saved_at)) > SNAPSHOT_PART_GAP_MS;
 
     const aptRows = apts
-        ? upcomingSnapshotAppointments(apts.items || [], localIsoDate(now)).map(a => snapshotEntry(a.title, [
+        ? upcomingSnapshotAppointments(snapshotItems(apts), localIsoDate(now)).map(a => snapshotEntry(a.title, [
             snapshotWhen(a.date, a.start_time, a.end_time),
             a.location ? `📍 ${a.location}` : '',
-            snapshotResponseText(a.response)
+            snapshotResponseText(a.response),
+            a.absence
         ]))
         : [];
-    root.appendChild(snapshotSection('Kommende Termine', apts, showStamps,
-        'Keine kommenden Termine im letzten Stand.', aptRows));
+    if (apts !== undefined) {
+        root.appendChild(snapshotSection('Kommende Termine', apts, showStamps,
+            'Keine kommenden Termine im letzten Stand.', aptRows));
+    }
 
     const histRows = hist
-        ? (hist.items || []).map(h => snapshotEntry(h.title, [h.when, h.meta, h.status]))
+        ? snapshotItems(hist).map(h => snapshotEntry(h.title, [h.when, h.meta, h.status]))
         : [];
-    root.appendChild(snapshotSection('Verlauf', hist, showStamps,
-        'Kein Verlauf im letzten Stand.', histRows));
+    if (hist !== undefined) {
+        root.appendChild(snapshotSection('Verlauf', hist, showStamps,
+            'Kein Verlauf im letzten Stand.', histRows));
+    }
 }
