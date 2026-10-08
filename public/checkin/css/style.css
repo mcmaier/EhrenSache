@@ -2052,6 +2052,75 @@ body:has(.modal.active) {
     font-size: 13px;
 }
 
+/* FI-24: Umschalter „Anwesenheit | Offene Antraege“ im Tab Liste.
+   Die Huellen #attendanceViewHeader und #attendanceView sind nur zum
+   gemeinsamen Ausblenden da: display:contents laesst Kopfkarte, Gliederungs-
+   leiste und Listenkarte Kinder des zentrierenden Flex-Layouts von
+   .tab-content.active bleiben wie bisher. Die [hidden]-Regel ist noetig, weil
+   jede display-Angabe das [hidden] des Browsers schlaegt. */
+.attendance-view-switch {
+    margin: 10px 0 12px;
+}
+
+#attendanceViewHeader,
+#attendanceView {
+    display: contents;
+}
+
+#attendanceViewHeader[hidden],
+#attendanceView[hidden],
+#pendingRequestsView[hidden] {
+    display: none;
+}
+
+#pendingRequestsView {
+    display: block;
+    background: var(--card-bg);
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    width: 100%;
+    max-width: 400px;
+}
+
+.pending-requests__section {
+    margin-bottom: 16px;
+}
+
+.pending-requests__section:last-child {
+    margin-bottom: 0;
+}
+
+.pending-requests__appointment {
+    margin: 8px 0 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.pending-requests__head {
+    margin: 0 0 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.pending-request {
+    padding: 6px 0;
+    border-top: 1px solid var(--border);
+}
+
+.pending-requests__head + .pending-request {
+    border-top: none;
+}
+
+.attendance-request__recorded {
+    margin: 4px 0;
+    font-size: 13px;
+    color: var(--text-light);
+}
+
 .btn-toggle-attendance:hover {
     transform: scale(1.05);
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);

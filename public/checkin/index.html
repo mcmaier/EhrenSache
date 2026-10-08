@@ -418,7 +418,16 @@
             <div class="tab-content" id="attendanceListPanel" data-tab="attendance-list">
                 <div class="attendance-header">
                     <h3>✅ Anwesenheitsliste</h3>
-                    
+
+                    <!-- FI-24: Anwesenheit oder alle offenen Antraege -->
+                    <div class="list-grouping attendance-view-switch" id="attendanceViewSwitch">
+                        <button type="button" class="list-grouping__btn is-active" aria-pressed="true"
+                                data-action="attendance-view" data-view="attendance">Anwesenheit</button>
+                        <button type="button" class="list-grouping__btn" aria-pressed="false"
+                                data-action="attendance-view" data-view="requests">Offene Anträge<span id="pendingRequestsCount"></span></button>
+                    </div>
+
+                    <div id="attendanceViewHeader">
                     <div class="filter-section">
                         <select id="attendanceAppointmentFilter" class="select-input">
                             <option value="">Termin wählen...</option>
@@ -436,8 +445,10 @@
                             ✎ Termin bearbeiten
                         </button>
                     </div>
+                    </div>
                 </div>
 
+                <div id="attendanceView">
                 <!-- Gruppierung der Anwesenheitsliste (alphabetisch/Gruppe/Untergruppe, FI-14) -->
                 <div id="attendanceGroupingBar"></div>
 
@@ -447,6 +458,12 @@
                             <p>Bitte wähle einen aktuellen Termin aus.</p>
                         </div>
                     </div>
+                </div>
+                </div>
+
+                <!-- FI-24: alle offenen Antraege, unabhaengig vom Check-in-Fenster -->
+                <div id="pendingRequestsView" hidden>
+                    <div id="pendingRequestsContent"></div>
                 </div>
             </div>
         </div>

@@ -118,14 +118,19 @@ test('Liste: den eigenen Antrag entscheidet niemand in der PWA', function () {
     $rumpf = ptFunktion('attendanceRequestsHtml');
     assertTrue(str_contains($rumpf, 'userData.member_id') && str_contains($rumpf, 'eigener'),
         'Ohne Abgleich mit dem eigenen Mitglied genehmigt sich ein Manager selbst (OI-3)');
-    assertTrue(str_contains($rumpf, 'escapeHtml(a.reason'), 'Die Begruendung kommt vom Mitglied und muss maskiert werden');
-    assertTrue(str_contains($rumpf, '<details'), 'Die Begruendung gehoert zugeklappt');
+    // Seit FI-24 steht die Zeile selbst in requestItemHtml() (gemeinsam mit "Offene Antraege").
+    assertTrue(str_contains($rumpf, 'requestItemHtml('), 'Die Liste nutzt die gemeinsame Antragszeile nicht');
+    $zeile = ptFunktion('requestItemHtml');
+    assertTrue(str_contains($zeile, 'escapeHtml(a.reason'), 'Die Begruendung kommt vom Mitglied und muss maskiert werden');
+    assertTrue(str_contains($zeile, '<details'), 'Die Begruendung gehoert zugeklappt');
 });
 
 test('Liste: Ablehnen fragt nach, Genehmigen laedt die Liste neu', function () {
     $rumpf = ptFunktion('handleRequestDecision');
     assertTrue(str_contains($rumpf, 'showNavigationConfirm('), 'Ablehnen ohne Rueckfrage');
-    assertTrue(str_contains($rumpf, 'loadAttendanceList()'), 'Ohne Neuladen fehlt der Eintrag, den die Genehmigung anlegt');
+    // Seit FI-24 laedt reloadAttendanceView() die sichtbare Ansicht; in "Anwesenheit" die Liste.
+    assertTrue(str_contains($rumpf, 'reloadAttendanceView()') && str_contains(ptFunktion('reloadAttendanceView'), 'loadAttendanceList()'),
+        'Ohne Neuladen fehlt der Eintrag, den die Genehmigung anlegt');
 });
 
 test('Liste: entschuldigt ist keine Anwesenheit', function () {
