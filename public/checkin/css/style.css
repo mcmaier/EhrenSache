@@ -2605,6 +2605,36 @@ body:has(.modal.active) {
     z-index: 90;
 }
 
+/* Hinweisleiste "Neue Version verfuegbar" (OI-43). Haftend wie der
+   Demo-Hinweis, eine Ebene darueber, falls beide stehen. */
+.update-banner {
+    position: sticky;
+    top: 0;
+    z-index: 95;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--primary-color);
+    color: var(--card-bg);
+    font-size: 14px;
+}
+
+.update-banner[hidden] {
+    display: none;
+}
+
+.update-banner__button {
+    background: var(--card-bg);
+    color: var(--primary-color);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
 
 /* Wo color-mix verfuegbar ist, folgen Flaeche, Schimmer und Kennzeichnung den
    eingestellten Vereinsfarben -- mit vertauschten Rollen gegenueber dem

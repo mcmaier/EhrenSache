@@ -104,17 +104,74 @@ let nfcAvailable = false;
 let currentStatsYear = new Date().getFullYear();
 let currentEditAppointmentId = null;
 
-// In checkin/index.html oder checkin/app.js
-    if ('serviceWorker' in navigator) {
-        //const currentPath = window.location.pathname;
-        //const basePath = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
+// ========================================
+// SERVICE WORKER (App-Rahmen, OI-43)
+// ========================================
+// Der Worker haelt den Rahmen vor. Eine neue Version installiert er im
+// Hintergrund; sie wartet, bis das Mitglied sie ueber die Hinweisleiste
+// uebernimmt. Erst dann laedt die Seite neu.
+let swRegistration = null;
+let updateRequested = false;
 
-        navigator.serviceWorker.register('./service-worker.js', {
-            scope: './'
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+        .then(reg => {
+            swRegistration = reg;
+            debug.log('✓ Service Worker registriert:', reg.scope);
+            watchForUpdate(reg);
         })
-        .then(reg => debug.log('✓ Service Worker registriert:', reg.scope))
-        .catch(err => debug.log('✗ Service Worker Fehler:', err));        
+        .catch(err => debug.log('✗ Service Worker Fehler:', err));
+
+    // Auch die Erstinstallation wechselt den Controller (clients.claim()).
+    // Neu geladen wird nur, wenn das Mitglied es ueber den Knopf verlangt hat.
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!updateRequested || reloading) return;
+        reloading = true;
+        window.location.reload();
+    });
+}
+
+/**
+ * Zeigt die Hinweisleiste, sobald eine neue Version wartet. Ohne bisherigen
+ * Controller ist es die Erstinstallation — dann gibt es nichts anzubieten.
+ */
+function watchForUpdate(reg) {
+    if (reg.waiting && navigator.serviceWorker.controller) {
+        showUpdateBanner(true);
     }
+
+    reg.addEventListener('updatefound', () => {
+        const worker = reg.installing;
+        if (!worker) return;
+
+        worker.addEventListener('statechange', () => {
+            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                showUpdateBanner(true);
+            }
+            // Hat der Worker ohne Knopf uebernommen (Umstieg vom
+            // Durchreich-Worker), gibt es nichts mehr anzubieten.
+            if (worker.state === 'activated' && !updateRequested) {
+                showUpdateBanner(false);
+            }
+        });
+    });
+}
+
+function showUpdateBanner(visible) {
+    const banner = document.getElementById('updateBanner');
+    if (banner) banner.hidden = !visible;
+}
+
+function applyUpdate() {
+    const waiting = swRegistration?.waiting;
+    if (!waiting) {
+        window.location.reload();
+        return;
+    }
+    updateRequested = true;
+    waiting.postMessage({ type: 'SKIP_WAITING' });
+}
 
 // ========================================
 // DOM ELEMENTS (werden nach DOMContentLoaded gesetzt)
@@ -186,6 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
     //elements.showTokenLoginButton.addEventListener('click', toggleTokenLogin);
     //elements.tokenLoginButton.addEventListener('click', handleTokenLogin);
     elements.logoutBtn.addEventListener('click', requestLogout);
+    document.getElementById('updateReloadBtn')?.addEventListener('click', applyUpdate);
     elements.scanButton.addEventListener('click', toggleScanner);
     elements.manualCodeBtn.addEventListener('click', openManualCodeInput);
     elements.exceptionBtn.addEventListener('click', openExceptionModal);
@@ -2413,6 +2471,9 @@ function tick() {
 // Zurueckkehren wird deshalb neu ausgerichtet, damit die Anzeige nicht
 // nachhinkt.
 document.addEventListener('visibilitychange', () => {
+    // Die App bleibt oft tagelang offen; der Browser sucht dann selten von
+    // selbst nach einem neuen Service Worker (OI-43).
+    if (!document.hidden) swRegistration?.update().catch(() => {});
     if (!document.hidden && tickTimer) startTicker();
     // Offene Punkte beim Zurueckkehren nachladen (FI-17, Regel aus OI-67) --
     // nur, wenn der Erfassen-Tab gerade der sichtbare ist; sonst steht der

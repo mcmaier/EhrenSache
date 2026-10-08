@@ -27,6 +27,9 @@ require_once __DIR__ . '/../lib/api.php';
  * - VERSION wird beim Release vergessen. Dann bleibt der Speichername gleich,
  *   kein neuer Service Worker wird installiert, und jedes Telefon behaelt den
  *   alten Rahmen — genau wie ein vergessenes ?v=, nur ohne Ausweg per Neuladen.
+ *
+ * Ein Test ruft die Vorladeliste per HTTP ab (tests/config.php, base_url): Die
+ * Suite braucht deshalb, anders als ihr Name nahelegt, einen laufenden Server.
  */
 
 $repoRoot = dirname(__DIR__, 2);

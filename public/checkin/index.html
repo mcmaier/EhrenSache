@@ -25,6 +25,12 @@
     <link rel="stylesheet" href="css/style.css?v=1.22.2">        
 </head>
 <body>
+    <!-- Neue Version des App-Rahmens wartet (OI-43). Erst der Knopf uebernimmt
+         sie, damit kein Neuladen eine laufende Eingabe verwirft. -->
+    <div id="updateBanner" class="update-banner" role="status" hidden>
+        <span>Neue Version verfügbar</span>
+        <button type="button" id="updateReloadBtn" class="update-banner__button">Neu laden</button>
+    </div>
     <!-- Ladeanzeige beim Start (OI-121). Liegt kein Token vor, blendet app.js
          sofort die Anmeldemaske ein; sonst steht diese Anzeige bis zum Ende
          des Starts da -- bis 1.20.1 war es die Anmeldemaske. -->
