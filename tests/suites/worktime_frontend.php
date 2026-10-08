@@ -85,6 +85,26 @@ test('Check-in-PWA: der Verlauf holt nur die eigenen Arbeitszeiten', function ()
     }
 });
 
+test('Check-in-PWA: die Taetigkeitsarten sind die des eigenen Mitglieds', function () use ($repoRoot) {
+    $js = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
+
+    // Ohne member_id liefert activity_types einem Admin oder Manager ALLE
+    // Arten (Verwaltungssicht des Dashboards). Starten darf er aber nur die
+    // seiner eigenen Gruppen (memberMayUseActivity) — die PWA bot ihm also
+    // Arten an, deren Start der Server ablehnte.
+    $alle = preg_match_all("/apiCall\(\s*'activity_types'\s*,\s*'GET'/", $js);
+    $eingegrenzt = preg_match_all(
+        "/apiCall\(\s*'activity_types'\s*,\s*'GET'\s*,\s*null\s*,\s*\{[^}]*\bmember_id\b/",
+        $js
+    );
+
+    assertTrue($alle > 0, 'Kein lesender activity_types-Aufruf in der PWA gefunden');
+    assertTrue(
+        $eingegrenzt === $alle,
+        "activity_types-Abruf ohne member_id: {$eingegrenzt} von {$alle} eingegrenzt"
+    );
+});
+
 test('Check-in-PWA: die Abmeldung raeumt die Ansichten des Mitglieds ab', function () use ($repoRoot) {
     $js = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
 

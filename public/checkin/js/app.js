@@ -4459,8 +4459,13 @@ async function initWorktime(generation = sessionGeneration) {
     }
 
     // Taetigkeiten und laufende Sitzung gleichzeitig (OI-121).
+    //
+    // member_id immer mit: Ohne sie bekommen Admin und Manager ALLE Arten
+    // (Verwaltungssicht), starten duerfen sie aber nur die ihrer eigenen
+    // Gruppen — die PWA bot sonst Arten an, deren Start der Server ablehnt.
+    // Ohne verknuepftes Mitglied 0: keine Art, wie bei der Rolle user.
     const [result, running] = await Promise.all([
-        apiCall('activity_types', 'GET'),
+        apiCall('activity_types', 'GET', null, { member_id: userData.member_id || 0 }),
         apiCall('work_sessions', 'GET', null, { running: 1 })
     ]);
 
