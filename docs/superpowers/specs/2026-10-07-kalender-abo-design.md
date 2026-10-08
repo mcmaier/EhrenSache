@@ -124,6 +124,10 @@ Einstellungsschlüssel ins Schema (`system_settings`, Default `0`).
   `VCALENDAR` ohne `VEVENT`).
 - `a.date BETWEEN heute − 3 Monate AND heute + 12 Monate`.
 - `a.is_auto_created = 0`.
+- Mitglied am Termintag aktiv: `getMemberActivityWhere('m', 'a.date')` über
+  `JOIN members m ON m.member_id = <Mitglied des Kontos>` — dieselbe Regel wie die Terminliste
+  der Check-in-App (`responsesFetchUpcomingIds()`) und die Statistik (Entscheidung 2026-10-08).
+  Termine in einem inaktiven Zeitraum fehlen, auch vergangene.
 - Eigene Rückmeldung per `LEFT JOIN appointment_responses` auf `member_id`.
 - `hide_declined = 1` → Termine mit eigener Rückmeldung `no` fehlen. `maybe` bleibt.
   Die Rückmeldung zählt nur, wenn die Terminart Rückmeldungen erlaubt (`responses_enabled`).
@@ -157,13 +161,20 @@ Organisationsname aus `system_settings` (`organization_name`); fehlt er, nur „
 | `LOCATION` | `location`, falls gesetzt |
 | `CATEGORIES` | Name der Terminart, falls gesetzt — nie die Gruppenzuordnung |
 | `DESCRIPTION` | Beschreibung; Leerzeile; `Terminart: …`; `Deine Rückmeldung: Zugesagt/Abgesagt/Unsicher` und ggf. `– <eigener Kommentar>`; als letzte Zeile ggf. `Rückmeldung geben: <Link>` bzw. mit eigener Rückmeldung `Rückmeldung ändern: <Link>` |
-| `URL` | Rückmelde-Link `<Basis-URL>/checkin/#rueckmeldung=<id>`, nur bei Terminart mit Rückmeldungen und Termin ab heute (Serverdatum); URI-Wert, nicht als Text maskiert (Entscheidung 2026-10-07) |
+| `URL` | Rückmelde-Link `<Basis-URL>/checkin/#rueckmeldung=<id>`, nur für Termine aus der Terminliste der App (`responsesFetchUpcomingIds()`: Terminart mit Rückmeldungen, ab heute, aktiv, höchstens 50; Entscheidung 2026-10-08); URI-Wert, nicht als Text maskiert (Entscheidung 2026-10-07) |
 
 Rückmelde-Link (Entscheidung 2026-10-07): Fragment statt Pfad oder Query, damit die Termin-ID nicht
 an den Server und in kein Zugriffsprotokoll geht; kein Token im Link — die Check-in-App verlangt
 die normale Anmeldung, öffnet danach den Tab „Termine“ mit aufgeklappter Karte und entfernt das
 Fragment. Ob ein Termin den Link bekommt, entscheidet der Handler (`response_url` je Zeile);
 `ical.php` gibt nur aus.
+
+Link nur für Termine der App-Liste (Entscheidung 2026-10-08): Der Handler holt einmal
+`responsesFetchUpcomingIds()` und setzt `response_url` nur für deren IDs — sonst führte der Link
+auf einen Termin, den die App nicht zeigt. Termine jenseits der 50 kommenden bleiben ohne Link im
+Kalender und bekommen ihn, sobald sie nachrücken. Landet ein Link trotzdem auf keiner Karte (etwa
+ein veralteter Kalenderstand), meldet die App „Dieser Termin steht nicht in deiner Terminliste.“;
+der Sprung aus den Offenen Punkten bleibt still.
 
 Gelöschte Termine fehlen beim nächsten Abruf; der Feed wird jedes Mal vollständig erzeugt,
 `STATUS:CANCELLED` ist nicht nötig.

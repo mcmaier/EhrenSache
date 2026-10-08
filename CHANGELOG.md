@@ -15,7 +15,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   abonnieren ihre Termine in Google Kalender, Apple Kalender oder Outlook — nur lesend, nur die
   Termine der eigenen Gruppen, die eigene Rückmeldung im Titel, abgesagte Termine auf Wunsch
   ausgeblendet. Termine ohne Ende erscheinen mit zwei Stunden Dauer. Kommende Termine mit
-  Rückmeldung enthalten einen Link, der die Check-in-App direkt auf der Karte des Termins öffnet.
+  Rückmeldung enthalten einen Link, der die Check-in-App direkt auf der Karte des Termins öffnet;
+  wie die Terminliste der App lässt der Feed Termine in inaktiven Zeiträumen des Mitglieds weg und
+  verlinkt nur Termine, die auch in dieser Liste stehen.
   Link jederzeit ersetzbar oder widerrufbar; gespeichert wird nur ein Hash.
   **Standardmäßig aus** (Systemeinstellungen → Termine & Anwesenheit). Neue Ressourcen
   `calendar_feed` und `calendar` (API.md). **Braucht die Tabelle `calendar_feeds`** — der
