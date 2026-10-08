@@ -19,7 +19,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Pflicht und wirkt nicht. Geräte dürfen ihre Zeit weiter mitschicken (Offline-Warteschlange
   des Terminals), aber nur innerhalb des Toleranzfensters zurück und höchstens fünf Minuten
   voraus. Ebenso wirkt `tolerance_hours` aus dem Request nur noch für Geräte. Die Antwort
-  enthält jetzt `arrival_time`. Betroffen waren alle bisherigen Versionen.
+  enthält jetzt `arrival_time`. Betroffen waren alle bisherigen Versionen. Siehe Advisory
+  GHSA-vmrc-3c9f-mfgv.
 
 ## [1.22.1] – 2026-10-06
 
