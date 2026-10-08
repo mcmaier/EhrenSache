@@ -39,7 +39,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Registrierung setzte auf einem Gerätekonto `account_status` und versuchte eine Mail an eine
   leere Adresse; auf einem bereits aktiven Konto verschickte sie die Aktivierungsmail erneut und
   überschrieb dabei die Mitgliedsverknüpfung. Jetzt antwortet sie mit `400` (Gerät) bzw. `409`
-  (bereits aktiv), bevor etwas geändert wird. Das Dashboard ruft den Endpunkt nur für offene
+  (bereits aktiv, abgeschaltet oder gesperrt — gesperrte Konten gibt nur noch „Entsperren“ frei),
+  bevor etwas geändert wird. Das Dashboard ruft den Endpunkt nur für offene
   Registrierungen auf und ist nicht betroffen. Die Abschnitte zu `activate_user` und
   `user_status` in `API.md` beschrieben andere Felder (`is_active`, `role`) und sind nach dem Code
   neu geschrieben.

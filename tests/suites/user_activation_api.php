@@ -168,6 +168,38 @@ test('activate_user: bereits aktives Konto -> 409, nichts geaendert', function (
     }
 });
 
+test('activate_user: gesperrtes Konto -> 409 mit Hinweis auf Entsperren, nichts geaendert', function () {
+    $id = null;
+    try {
+        // Mail bleibt an: Ohne die Pruefung liefe hier ein SMTP-Versuch (lokal
+        // 127.0.0.1:1025, keine echte Zustellung) und der Status kaeme als 500.
+        $id     = uaCreateUser('user', 'suspended', 0);
+        $vorher = uaUserRow($id);
+        $res    = uaActivate(['user_id' => $id]);
+        assertStatus(409, $res, 'gesperrtes Konto');
+        assertTrue(str_contains((string) ($res['body']['message'] ?? ''), 'Entsperren'),
+            'Meldung verweist nicht auf Entsperren: ' . $res['raw']);
+        assertSame($vorher, uaUserRow($id), 'gesperrtes Konto wurde veraendert');
+    } finally {
+        uaDeleteUser($id);
+    }
+});
+
+test('activate_user: freigegebenes, aber abgeschaltetes Konto (active, is_active 0) -> 409, nichts geaendert', function () {
+    $id = null;
+    try {
+        $id     = uaCreateUser('user', 'active', 0);
+        $vorher = uaUserRow($id);
+        $res    = uaActivate(['user_id' => $id]);
+        assertStatus(409, $res, 'active/is_active 0');
+        assertTrue(str_contains((string) ($res['body']['message'] ?? ''), 'Entsperren'),
+            'Meldung verweist nicht auf Entsperren: ' . $res['raw']);
+        assertSame($vorher, uaUserRow($id), 'Konto wurde veraendert');
+    } finally {
+        uaDeleteUser($id);
+    }
+});
+
 test('activate_user: Registrierung (pending, verifiziert) wird freigegeben', function () {
     $id = null;
     try {

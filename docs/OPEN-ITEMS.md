@@ -2695,9 +2695,12 @@ Mail versucht wird. Das Dashboard ruft `activate_user` nur für `pending`-Konten
 Request-Beispiele gegen die Felder, die der Handler liest (`api_doc_keys_write` ruft
 `activate_user` bewusst nicht auf, weil es Mails verschickt).
 
-**Dabei aufgefallen, offen gelassen** (in API.md dokumentiert): `activate_user` gibt ein
-gesperrtes oder per `is_active = 0` abgeschaltetes Konto weiterhin frei und verschickt die
-Mail; es prüft nicht, ob das Mitglied schon mit einem anderen Benutzer verknüpft ist (anders
+**Nachtrag 2026-10-08 (Entscheidung des Nutzers):** Auch gesperrte Konten (`suspended`) und
+freigegebene, aber abgeschaltete (`active`, `is_active = 0`) weist `activate_user` mit `409` ab;
+beide schaltet `user_status` mit `status: "active"` wieder ein, ohne Mail und ohne die
+Mitgliedsverknüpfung anzufassen. Durch kommt nur noch `pending`.
+
+**Dabei aufgefallen, offen gelassen** (in API.md dokumentiert): `activate_user` prüft nicht, ob das Mitglied schon mit einem anderen Benutzer verknüpft ist (anders
 als `PUT users`); scheitert der Mailversand (SMTP nicht erreichbar), antwortet es `500`, obwohl
 die Freigabe bereits gespeichert ist. `user_status` antwortet `404`, wenn Status und
 `is_active` schon den Zielwert haben (`rowCount() === 0`). Alles nur für Admins erreichbar.

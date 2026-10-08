@@ -955,12 +955,26 @@ function handleUserActivation($db, $database, $method) {
             exit();
         }
 
+        // Gesperrt: Die Sperre hebt user_status auf ("Entsperren" im Dashboard).
+        // activate_user haette sie stillschweigend aufgehoben, die Aktivierungsmail
+        // erneut verschickt und member_id ueberschrieben.
+        if ($user['account_status'] === 'suspended') {
+            http_response_code(409);
+            echo json_encode(['message' => 'Konto ist gesperrt – über „Entsperren“ freigeben']);
+            exit();
+        }
+
         // Bereits freigegeben: Ein erneuter Aufruf verschickte die Aktivierungsmail
         // noch einmal und ueberschriebe member_id (ohne member_id im Request mit
-        // pending_member_id, also meist NULL). Gesperrte Konten hebt user_status auf.
-        if ($user['account_status'] === 'active' && (int) $user['is_active'] === 1) {
+        // pending_member_id, also meist NULL). Ist das Konto nur abgeschaltet
+        // (is_active = 0), schaltet es user_status mit status 'active' wieder ein --
+        // das setzt account_status 'active' und is_active 1, ohne Mail und ohne
+        // member_id anzufassen.
+        if ($user['account_status'] === 'active') {
             http_response_code(409);
-            echo json_encode(['message' => 'Benutzer ist bereits aktiv']);
+            echo json_encode(['message' => (int) $user['is_active'] === 1
+                ? 'Benutzer ist bereits aktiv'
+                : 'Konto ist bereits freigegeben, aber deaktiviert – über „Entsperren“ wieder einschalten']);
             exit();
         }
 

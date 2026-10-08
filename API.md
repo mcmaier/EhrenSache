@@ -3325,12 +3325,11 @@ Datenbank (`500`).
 | `403` | nicht Admin |
 | `404` | Konto existiert nicht |
 | `405` | andere Methode als `POST` |
-| `409` | Konto ist bereits aktiv (`account_status = 'active'` und `is_active = 1`; seit OI-127, keine Mail) |
+| `409` | Konto ist nicht mehr offen (seit OI-127, nichts wird geändert, keine Mail): bereits aktiv (`account_status = 'active'`, `is_active = 1`, `"Benutzer ist bereits aktiv"`), freigegeben, aber abgeschaltet (`active`, `is_active = 0`) oder gesperrt (`suspended`, `"Konto ist gesperrt – über „Entsperren“ freigeben"`). Die beiden letzten schaltet `user_status` mit `status: "active"` wieder ein |
 | `500` | Datenbankfehler — **oder Versand der Aktivierungsmail gescheitert**: Die Freigabe ist dann bereits gespeichert |
 
-Ein gesperrtes (`suspended`) oder ein aktives, aber per `is_active = 0` abgeschaltetes Konto
-weist der Endpunkt nicht ab: Er gibt es frei und verschickt die Aktivierungsmail. Das Dashboard
-ruft ihn nur für Registrierungen auf.
+Durch kommt damit nur ein Konto mit `account_status = 'pending'`. Das Dashboard ruft den Endpunkt
+nur für solche Registrierungen auf.
 
 ---
 
