@@ -134,10 +134,13 @@ function attendanceCounts(array $expected, array $status): array
  * responsesAttachSummaries() in responses.php. Die Regel steht seit
  * 2026-10-01 nur noch in expectedPairsSql() -- auch die Statistik liest dort.
  *
+ * $memberId grenzt auf ein Mitglied ein (OI-98): Wer nur den eigenen Status
+ * braucht, rechnet nicht die Soll-Menge des ganzen Vereins.
+ *
  * @param array<int, int> $appointmentIds
  * @return array<int, array<int, bool>> appointmentId => [memberId => true]
  */
-function attendanceExpectedMemberIds(PDO $db, $database, array $appointmentIds): array
+function attendanceExpectedMemberIds(PDO $db, $database, array $appointmentIds, ?int $memberId = null): array
 {
     $expectedBy = [];
     if ($appointmentIds === []) {
@@ -146,7 +149,11 @@ function attendanceExpectedMemberIds(PDO $db, $database, array $appointmentIds):
 
     require_once __DIR__ . '/expected_pairs.php';
 
-    [$epSql, $epParams] = expectedPairsSql($database, ['appointment_ids' => $appointmentIds]);
+    $filter = ['appointment_ids' => $appointmentIds];
+    if ($memberId !== null) {
+        $filter['member_id'] = $memberId;
+    }
+    [$epSql, $epParams] = expectedPairsSql($database, $filter);
 
     $stmt = $db->prepare("SELECT DISTINCT ep.appointment_id, ep.member_id FROM ({$epSql}) ep");
     $stmt->execute($epParams);
@@ -180,15 +187,27 @@ function attendanceAttachSummaries($db, $database, array $appointments, ?int $vi
     $expectedBy = [];
     $statusBy   = [];
 
-    if ($ids !== []) {
+    // Mitglieder sehen nur den eigenen Status (unten). Soll-Menge und Records
+    // aller anderen braucht es dafuer nicht -- bei 500 Mitgliedern und 600
+    // Terminen im Jahr kostete das rund 260 ms je Jahresabruf (OI-98). Ohne
+    // verknuepftes Mitglied gibt es nichts zu zaehlen.
+    $onlyMember = $forManager ? null : $viewerMemberId;
+
+    if ($ids !== [] && ($forManager || $onlyMember !== null)) {
         $prefix       = $database->table('');
-        $expectedBy   = attendanceExpectedMemberIds($db, $database, $ids);
+        $expectedBy   = attendanceExpectedMemberIds($db, $database, $ids, $onlyMember);
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
-        $stmt = $db->prepare("SELECT appointment_id, member_id, status
-                              FROM {$prefix}records
-                              WHERE appointment_id IN ({$placeholders})");
-        $stmt->execute($ids);
+        $sql    = "SELECT appointment_id, member_id, status
+                   FROM {$prefix}records
+                   WHERE appointment_id IN ({$placeholders})";
+        $params = $ids;
+        if ($onlyMember !== null) {
+            $sql     .= " AND member_id = ?";
+            $params[] = $onlyMember;
+        }
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $statusBy[(int) $row['appointment_id']][(int) $row['member_id']] = (string) $row['status'];
         }

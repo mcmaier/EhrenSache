@@ -267,6 +267,63 @@ test('Ein Mitglied sieht nur den eigenen Status, keine Zahlen', function () {
     }
 });
 
+test('Mitglied: eigener Status bleibt richtig, wenn andere Mitglieder Records haben (OI-98)', function () {
+    // Seit OI-98 rechnet der Server fuer Mitglieder nur das eigene Mitglied. Die
+    // Records der anderen duerfen den eigenen Status nicht beeinflussen, und die
+    // Verwalterzahlen derselben Termine bleiben die ueber alle Mitglieder.
+    $world = caWorld('Eigen');
+    $memberId = apiMemberId('user');
+    assertTrue($memberId !== null, 'Testkonto user hat kein verknuepftes Mitglied');
+    $gruppenVorher = caMemberGroupIds($memberId);
+    $seit = caDateInDays(-30);
+    assertTrue($gruppenVorher !== [], "Testkonto user (Mitglied {$memberId}) hat keine Gruppe");
+
+    try {
+        caSetMemberGroups($memberId, array_values(array_unique(array_merge($gruppenVorher, [$world['group']]))), $seit);
+
+        // Je Termin ein eigener Tag: Termine derselben Art im Abstand von
+        // weniger als zwei Stunden lehnt der Server als Dublette ab (409).
+        $erwartet = [];
+        $tage     = [];
+        foreach (['present', null, 'excused'] as $i => $eigener) {
+            $tag = caDateInDays(-3 - $i);
+            $apt = caAppointment($world, $tag);
+            $tage[$apt] = $tag;
+            // Von den drei anderen Mitgliedern der Welt ist eines anwesend, eines
+            // entschuldigt, eines fehlt.
+            caRecord($apt, $world['members'][0], 'present');
+            caRecord($apt, $world['members'][1], 'excused');
+            if ($eigener !== null) {
+                caRecord($apt, $memberId, $eigener);
+            }
+            $erwartet[$apt] = $eigener ?? 'missing';
+        }
+
+        foreach ($erwartet as $apt => $status) {
+            $tag = $tage[$apt];
+            $row = caFetch($apt, $tag, 'user', ['include' => 'attendance']);
+            assertTrue($row !== null, "Termin {$apt} fehlt in der Mitgliedersicht");
+            assertSame($status, $row['own_attendance'], "Eigener Status bei Termin {$apt}");
+            assertTrue(!array_key_exists('attendance', $row), 'Ein Mitglied darf keine Zahlen ueber andere sehen');
+
+            $verwalter = caFetch($apt, $tag, 'manager', ['include' => 'attendance']);
+            $a = $verwalter['attendance'];
+            assertSame(4, $a['expected'], 'Verwalter zaehlt alle vier erwarteten Mitglieder');
+            assertSame(1 + ($status === 'present' ? 1 : 0), $a['present'], "present bei Termin {$apt}");
+            assertSame(1 + ($status === 'excused' ? 1 : 0), $a['excused'], "excused bei Termin {$apt}");
+        }
+    } finally {
+        caSetMemberGroups($memberId, $gruppenVorher, $seit);
+        $gruppenNachher = caMemberGroupIds($memberId);
+        caDropWorld($world);
+
+        sort($gruppenVorher);
+        sort($gruppenNachher);
+        assertSame($gruppenVorher, $gruppenNachher,
+            "Gruppen von Mitglied {$memberId} nach der Wiederherstellung veraendert");
+    }
+});
+
 test('Ohne Anwesenheit gilt das Mitglied als fehlend, ohne Erwartung als null', function () {
     $world = caWorld('Fehlend');
     try {
