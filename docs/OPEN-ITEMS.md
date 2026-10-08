@@ -625,7 +625,7 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
 ---
 
 ### OI-43 · Offline-Betrieb der Check-in-PWA
-**Priorität:** niedrig · **Richtung entschieden am 2026-10-08:** Rahmen ja, Lesestand begrenzt, Schreiben nein — gebaut ist noch nichts
+**Priorität:** niedrig · **Richtung entschieden am 2026-10-08:** Rahmen ja, Lesestand begrenzt, Schreiben nein · **Stufe 1 gebaut** (2026-10-08, unveröffentlicht)
 
 Die Check-in-PWA hat **keinen Cache**. Ihr Service Worker reicht jede Anfrage ans Netz durch;
 er dient allein der Installierbarkeit auf dem Startbildschirm. Ohne Verbindung zeigt die App
@@ -668,6 +668,18 @@ Laden des Rahmens oder das Lesen. Die Tabellenzeile ist entsprechend eingegrenzt
    absichern (`tests/suites/assets.php`), alte Caches in `activate` löschen und eine neue
    Version sichtbar anbieten („Neue Version — neu laden“), damit niemand an einem veralteten
    Rahmen hängen bleibt.
+   **Umgesetzt** (Spec `docs/superpowers/specs/2026-10-08-pwa-rahmen-cache-design.md`): Speicher
+   `checkin-<VERSION>`, Hinweisleiste „Neue Version verfügbar“, Wächter
+   `tests/suites/pwa_cache_frontend.php`, Browserprüfung `tests/browser/pwa-offline.mjs`. Der
+   Service Worker legt `./` vor (Apache leitet `index.html` auf `./` um; eine umgeleitete Antwort
+   im Speicher bricht Navigationen) und beantwortet `./`, `index.html` und den Rückmelde-Link
+   `#rueckmeldung=…` aus dem Speicher, Query und Fragment werden vor dem Vergleich abgeschnitten.
+   Bekannte Grenzen: (1) Ein hochgeladenes Vereinslogo (`../uploads/…`) wird nicht gespeichert —
+   ohne Netz erscheint dort ein defektes Bild. (2) Ein zweiter offener Tab, in dem niemand „Neu
+   laden“ gedrückt hat, behält den alten Rahmen bis zum Neuladen. (3) Bei unveränderter `VERSION`
+   (Feature-Zweige, `dev`) überschreibt ein geänderter Service Worker den aktiven Speicher an Ort
+   und Stelle — nur außerhalb von Releases, denn jedes Release erhöht `VERSION` (Test
+   `pwa_cache_frontend`).
 2. **Gelesene Daten — höchstens begrenzt.** Für Terminliste und eigenen Verlauf denkbar als
    „Netz zuerst, sonst letzter Stand“. Bedingungen: Jede so gezeigte Ansicht trägt sichtbar
    „Stand von hh:mm, ohne Verbindung“ — sonst entsteht absichtlich, was

@@ -79,6 +79,22 @@ Sobald du dich im Web-Dashboard registriert hast und von einem Admin freigeschal
 - **API erfordert Internet**: Check-In benötigt Online-Verbindung
 - **Kein Background Sync**: Keine Offline-Queue für Check-Ins
 
+### Ohne Verbindung
+
+Die App hält ihren Rahmen (Seite, Gestaltung, Programmcode, Symbole) im Speicher des Service
+Workers. Ohne Netz öffnet sie deshalb trotzdem und meldet „Server nicht erreichbar.“ mit der
+Möglichkeit, es erneut zu versuchen; die gespeicherte Anmeldung bleibt erhalten. Daten hält sie
+nicht vor, und ohne Netz nimmt sie keine Check-ins, Rückmeldungen oder Zeiten an — ein
+Zeitpunkt vom Telefon wäre als Nachweis wertlos (OI-43). Auch der Rückmelde-Link
+(`#rueckmeldung=…`) öffnet ohne Netz den gespeicherten Rahmen.
+
+Nach einem Update erscheint oben „Neue Version verfügbar“. Erst „Neu laden“ übernimmt sie, damit
+keine laufende Eingabe verloren geht.
+
+Bekannte Grenze: Ein hochgeladenes Vereinslogo (`../uploads/…`) wird nicht zwischengespeichert.
+Ohne Netz zeigt die App an seiner Stelle ein defektes Bild; das Standardlogo ist gespeichert,
+doch die Darstellungseinstellungen bestimmen, welche Adresse geladen wird.
+
 ---
 
 ## 🐛 Troubleshooting

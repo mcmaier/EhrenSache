@@ -318,6 +318,12 @@ php tests/run.php worktime_api
   weiter den alten Stand, ein normales Neuladen hilft nicht. Abhilfe: harter Reload bzw. in den
   Entwicklerwerkzeugen „Disable cache“; Puppeteer-Skripte mit frischem Profil sind nicht
   betroffen. Die HTML-Seiten selbst bleiben `no-cache`
+- **Check-in-App aus dem Service-Worker-Speicher:** Die PWA hält ihren Rahmen im Speicher
+  `checkin-<Version>` (OI-43). Im Feature-Branch ändert sich die Version nicht — geänderte Dateien
+  unter `public/checkin/` kommen im Browser weiter aus dem Speicher. Abhilfe: in den
+  Entwicklerwerkzeugen unter Application → Service Workers „Update on reload“ oder „Bypass for
+  network“. Puppeteer-Skripte mit `setBypassServiceWorker(true)` oder frischem Profil sind nicht
+  betroffen. Verhalten prüfen: `node tests/browser/pwa-offline.mjs`
 - Konfiguration: `tests/config.php` aus `tests/config.example.php` kopieren (ignoriert)
 - Manueller Testplan: `docs/testplan.md`
 - Verifizierung wenn möglich selbst durchführen
@@ -362,7 +368,8 @@ php tests/run.php worktime_api
 - Versionssprung: `version.json` und `CHANGELOG.md` gemeinsam pflegen; dazu die Versionsangabe an
   den Assets — `?v=` in Check-in-App und Station, der Pfadabschnitt `v<Version>/` in
   `public/index.html` und `public/login.html` (Suchen und Ersetzen; `tests/suites/assets.php`
-  meldet jede vergessene Stelle)
+  meldet jede vergessene Stelle) und `VERSION` in `public/checkin/service-worker.js` (sonst
+  behalten installierte Check-in-Apps den alten Rahmen; `tests/suites/pwa_cache_frontend.php`)
 
 ## Releases bei parallelen Sitzungen
 
