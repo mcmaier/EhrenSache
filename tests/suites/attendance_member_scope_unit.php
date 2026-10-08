@@ -70,7 +70,7 @@ function amsDb(): AmsSpyPdo
     $pdo->exec('CREATE TABLE ams_system_settings (setting_key TEXT, setting_value TEXT)');
     $pdo->exec("INSERT INTO ams_system_settings VALUES ('checkin_tolerance_hours', '2')");
     $pdo->exec('CREATE TABLE ams_members (member_id INTEGER PRIMARY KEY, active INTEGER)');
-    $pdo->exec('CREATE TABLE ams_membership_dates (member_id INTEGER, start_date TEXT, end_date TEXT)');
+    $pdo->exec('CREATE TABLE ams_membership_dates (member_id INTEGER, start_date TEXT, end_date TEXT, status TEXT DEFAULT \'active\')');
     $pdo->exec('CREATE TABLE ams_member_group_assignments (member_id INTEGER, group_id INTEGER, valid_from TEXT)');
     $pdo->exec('CREATE TABLE ams_member_group_history (member_id INTEGER, group_id INTEGER, valid_from TEXT, valid_to TEXT)');
     $pdo->exec('CREATE TABLE ams_appointment_type_groups (type_id INTEGER, group_id INTEGER)');

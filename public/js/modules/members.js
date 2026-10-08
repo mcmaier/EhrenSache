@@ -18,7 +18,7 @@ import { registerActions } from './actions.js';
 import { loadGroups } from './management.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
-import { CHIPS_MEMBERS, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
+import { CHIPS_MEMBERS, memberActiveToday, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
 // MEMBERS
@@ -204,7 +204,9 @@ function renderMembers(members, page = 1) {
     
     pageMembers.forEach(member => {  
         const tr = document.createElement('tr');
-        if (!member.is_active_in_period) {
+        // Tagesgenau, nicht "irgendwann im Jahr" (OI-130)
+        const activeToday = memberActiveToday(member);
+        if (!activeToday) {
             tr.classList.add('row-inactive');
         }
 
@@ -233,7 +235,7 @@ function renderMembers(members, page = 1) {
                 <td>${escapeHtml(member.name)}</td>
                 <td>${member.member_number ? escapeHtml(member.member_number) : '-'}${member.has_pin ? ' <span title="Stations-PIN gesetzt">🔢</span>' : ''}</td>
                 <td>${groupBadges}</td>
-                <td>${member.is_active_in_period ? 'Aktiv' : 'Inaktiv'}</td>
+                <td>${activeToday ? 'Aktiv' : 'Inaktiv'}</td>
                 ${actionsHtml}
                 `;
 
@@ -521,10 +523,10 @@ export async function loadMemberData(memberId) {
         document.getElementById('member_number').value = member.member_number || '';
         const statusEl = document.getElementById('member_active_status');
         if (statusEl) {
-            // Single-GET returns no is_active_in_period — read from cache, fallback to active flag
-            const cachedMembers = dataCache.members[currentYear]?.data || [];
-            const cached = cachedMembers.find(m => m.member_id == member.member_id);
-            const isActive = cached ? !!cached.is_active_in_period : (member.active == 1);
+            // Der Einzelabruf traegt is_active_today, den Stand heute (OI-130)
+            const isActive = member.is_active_today !== undefined
+                ? memberActiveToday(member)
+                : (member.active == 1);
             statusEl.textContent = isActive ? 'Aktiv' : 'Inaktiv';
             statusEl.className = isActive
                 ? 'status-badge status-approved'

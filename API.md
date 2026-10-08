@@ -507,7 +507,8 @@ behandeln, nie als HTML.
   still ignoriert.
 
 **Welche Mitglieder die Liste enthält:** Mit `date` gilt die Aktivregel für diesen Tag
-(`members.active = 1` und der Tag in einem Zeitraum aus `membership_dates`), mit `year` „im
+(`members.active = 1` und der Tag nach `membership_dates` aktiv, siehe
+[Mitgliedschaftszeiträume](#mitgliedschaftszeiträume-membership_dates)), mit `year` „im
 Jahr irgendwann aktiv". **Ohne beide** unterscheidet sich das nach Rolle: Die Rolle `device`
 bekommt die Regel von heute — dieselbe wie am Kiosk, damit ein Terminal Zuordnungen zu
 ausgetretenen Mitgliedern als verwaist erkennen kann (bis dahin kamen alle Mitglieder). Admin,
@@ -541,6 +542,7 @@ im Browser (`globalPaginationValue` in `settings.js`). Serverseitig paginiert ei
     "group_ids": "2, 5720",
     "group_names": "Jugend, Klarinetten",
     "is_active_in_period": 1,
+    "is_active_today": 1,
     "has_pin": false
   }
 ]
@@ -548,6 +550,9 @@ im Browser (`globalPaginationValue` in `settings.js`). Serverseitig paginiert ei
 
 `group_ids` und `group_names` sind **Zeichenketten** mit `, ` als Trenner, keine Arrays.
 `is_active_in_period` bezieht sich auf den über `year` oder `date` gewählten Zeitraum.
+`is_active_today` ist der Stand von heute, unabhängig von `year` und `date` (seit OI-130) —
+das Dashboard zeigt damit aktiv/inaktiv tagesgenau an; `is_active_in_period` steuert weiter die
+Auswahllisten (Anwesenheit, Ausnahmen, Statistik).
 Mitgliedschaftszeiträume liefert die Liste nicht — dafür gibt es die eigene Ressource
 `membership_dates`.
 
@@ -581,6 +586,7 @@ Die Einzelantwort ist ein Objekt und trägt statt der beiden Zeichenketten ein `
   "pin_updated_at": null,
   "active": 1,
   "created_at": "2026-09-10 11:41:55",
+  "is_active_today": 1,
   "groups": [
     { "group_id": 2, "group_name": "Jugend", "valid_from": null },
     { "group_id": 5720, "group_name": "Klarinetten", "valid_from": "2026-06-01" }
@@ -602,7 +608,7 @@ trägt weder `valid_from` noch `group_history`.
 
 Ein `user` ohne Admin- oder Managerrolle bekommt auf denselben Endpunkt nur die eigenen
 Stammdaten (`member_id`, `name`, `surname`, `member_number`, `active`, `group_ids`,
-`is_active_in_period`) und bei fremder `id` zusätzlich ein `warning`; die fremde `id` wird
+`is_active_in_period`, `is_active_today`) und bei fremder `id` zusätzlich ein `warning`; die fremde `id` wird
 ignoriert, nicht abgewiesen. `is_active_in_period` folgt derselben Regel wie im Listenabruf: mit
 `year` „im Jahr irgendwann aktiv“, ohne `year` gleich `active` (seit OI-91).
 
@@ -615,6 +621,7 @@ ignoriert, nicht abgewiesen. `is_active_in_period` folgt derselben Regel wie im 
   "active": 1,
   "group_ids": "2, 5720",
   "is_active_in_period": 1,
+  "is_active_today": 1,
   "warning": null
 }
 ```
@@ -1870,8 +1877,9 @@ den vorhandenen Status (`present`, `excused`) oder `null`. `identify`, `checkin`
 `server_time` (Status-Endpunkt) rechnen mit der Datenbankuhr des Servers; `server_unix` und der
 Stations-Code (TOTP) laufen dagegen auf Unix-Zeit, unabhängig von der Zeitzone der Datenbank.
 
-**Wer als aktiv gilt (OI-27):** `members.active = 1` **und** der heutige Tag liegt in einem
-Zeitraum aus `membership_dates` — dieselbe Regel, nach der Statistik und Anwesenheitsbericht
+**Wer als aktiv gilt (OI-27):** `members.active = 1` **und** der heutige Tag ist nach
+`membership_dates` aktiv (Regel seit OI-130 siehe
+[Mitgliedschaftszeiträume](#mitgliedschaftszeiträume-membership_dates)) — dieselbe Regel, nach der Statistik und Anwesenheitsbericht
 rechnen (`getMemberActivityWhere()`). Ein Mitglied ohne Einträge in `membership_dates` gilt wie
 bisher allein über `active` als aktiv; das ist der Normalfall. Bis 1.13.0 prüfte der Kiosk nur
 `active` — ein Mitglied mit abgelaufenem oder erst künftigem Zeitraum konnte also stempeln,
@@ -4079,6 +4087,16 @@ dabei; neuestes zuerst):
 ---
 
 ## Mitgliedschaftszeiträume (membership_dates)
+
+**Wann ein Mitglied an einem Tag aktiv ist (seit OI-130):** `members.active = 1`, der Tag liegt
+in **keinem** Zeitraum mit `status: "inactive"`, und — sofern das Mitglied Zeiträume mit
+`status: "active"` hat — in einem davon. Ohne aktive Zeiträume gilt das Mitglied außerhalb der
+inaktiven als aktiv, ohne jeden Zeitraum allein über `active`. Ein inaktiver Zeitraum hat damit
+Vorrang: „ab 01.10. inaktiv“ (offenes Ende) beendet die Aktivität am 01.10., ein inaktiver
+Zeitraum innerhalb eines aktiven unterbricht ihn. Bis dahin wurde `status` nirgends ausgewertet,
+jeder Zeitraum wirkte wie ein aktiver. Dieselbe Regel gilt in Mitgliederliste, Statistik,
+Anwesenheitsliste, Kiosk, `auto_checkin`, Terminrückmeldungen und Kalender-Abo
+(`getMemberActivityWhere()`); „im Jahr aktiv“ heißt: an mindestens einem Tag des Jahres.
 
 ### Zeiträume abrufen
 **Endpoint:** `GET /api.php?resource=membership_dates`

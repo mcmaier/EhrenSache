@@ -232,6 +232,7 @@ if (!extension_loaded('pdo_sqlite')) {
         $ins->execute(['Elke', 'Ende',    '500', $pinHash2580, 1]);   // Zeitraum abgelaufen
         $ins->execute(['Konrad', 'Kommt', '600', $pinHash2580, 1]);   // Zeitraum beginnt erst
         $ins->execute(['Lena', 'Laeuft',  '700', $pinHash2580, 1]);   // Zeitraum offen
+        $ins->execute(['Paul', 'Pause',   '800', $pinHash2580, 1]);   // Inaktiv-Zeitraum laeuft (OI-130)
 
         // Mitgliedschaftszeitraeume (OI-27): Der Stempel prueft sie ueber
         // dieselbe Regel wie die Statistik. Wer hier keinen Eintrag hat, gilt
@@ -239,12 +240,15 @@ if (!extension_loaded('pdo_sqlite')) {
         // die Mitglieder 1 bis 5 ohne Zeitraum.
         $pdo->exec("CREATE TABLE ut_membership_dates (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        member_id INTEGER, start_date TEXT, end_date TEXT)");
-        $zeit = $pdo->prepare("INSERT INTO ut_membership_dates (member_id, start_date, end_date)
-                               VALUES (?, ?, ?)");
-        $zeit->execute([6, date('Y-m-d', strtotime('-2 years')), date('Y-m-d', strtotime('-1 day'))]);
-        $zeit->execute([7, date('Y-m-d', strtotime('+7 days')), null]);
-        $zeit->execute([8, date('Y-m-d', strtotime('-1 day')), null]);
+                        member_id INTEGER, start_date TEXT, end_date TEXT,
+                        status TEXT DEFAULT 'active')");
+        $zeit = $pdo->prepare("INSERT INTO ut_membership_dates (member_id, start_date, end_date, status)
+                               VALUES (?, ?, ?, ?)");
+        $zeit->execute([6, date('Y-m-d', strtotime('-2 years')), date('Y-m-d', strtotime('-1 day')), 'active']);
+        $zeit->execute([7, date('Y-m-d', strtotime('+7 days')), null, 'active']);
+        $zeit->execute([8, date('Y-m-d', strtotime('-1 day')), null, 'active']);
+        // Status inactive heisst "in diesem Zeitraum inaktiv" (OI-130)
+        $zeit->execute([9, date('Y-m-d', strtotime('-1 day')), null, 'inactive']);
 
         $_SESSION = [];
 
@@ -426,6 +430,12 @@ if (!extension_loaded('pdo_sqlite')) {
     test('stationAuthenticate lehnt einen erst kuenftigen Zeitraum ab (OI-27)', function () {
         [$db, $database, $limiter] = stationTestDb();
         assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '600', '2580', $failure));
+        assertSame('invalid', $failure);
+    });
+
+    test('stationAuthenticate lehnt ein Mitglied im laufenden Inaktiv-Zeitraum ab (OI-130)', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '800', '2580', $failure));
         assertSame('invalid', $failure);
     });
 

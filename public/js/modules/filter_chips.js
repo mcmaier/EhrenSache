@@ -42,10 +42,15 @@ export const CHIPS_WORKTIME = Object.freeze([
     { key: 'rejected',  label: 'Abgelehnt', variant: 'danger',  match: s => hasEnd(s) && s.status === 'rejected' },
 ]);
 
+// Die Mitgliederliste zeigt aktiv/inaktiv tagesgenau (OI-130): is_active_today
+// ist der Stand heute, is_active_in_period nur "irgendwann im Jahr aktiv" und
+// bleibt Rueckfall fuer Antworten ohne das neue Feld.
+export const memberActiveToday = m => isOne(m.is_active_today ?? m.is_active_in_period);
+
 export const CHIPS_MEMBERS = Object.freeze([
     { key: 'all',      label: 'Alle' },
-    { key: 'active',   label: 'Aktiv',   variant: 'ok', match: m => isOne(m.is_active_in_period) },
-    { key: 'inactive', label: 'Inaktiv',                match: m => !isOne(m.is_active_in_period) },
+    { key: 'active',   label: 'Aktiv',   variant: 'ok', match: m => memberActiveToday(m) },
+    { key: 'inactive', label: 'Inaktiv',                match: m => !memberActiveToday(m) },
 ]);
 
 export const CHIPS_USERS = Object.freeze([

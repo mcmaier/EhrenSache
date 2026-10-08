@@ -80,6 +80,16 @@ test('Mitglieder: Aktiv/Inaktiv, auch mit Zahl oder Text aus der API', () => {
     assertPartition(CHIPS_MEMBERS, items, 'Mitglieder');
 });
 
+test('Mitglieder: is_active_today (Stand heute) geht vor is_active_in_period (OI-130)', () => {
+    const items = [
+        { is_active_in_period: 1, is_active_today: 0 },   // im Jahr aktiv, heute nicht mehr
+        { is_active_in_period: 0, is_active_today: 1 },    // Feld des Stichtags gewinnt
+        { is_active_in_period: 0, is_active_today: '1' },
+    ];
+    assert.deepEqual(countChips(items, CHIPS_MEMBERS), { all: 3, active: 2, inactive: 1 });
+    assertPartition(CHIPS_MEMBERS, items, 'Mitglieder heute');
+});
+
 test('Benutzer: Partition', () => {
     assertPartition(CHIPS_USERS,
         [{ account_status: 'pending' }, { account_status: 'active' }, { account_status: 'suspended' }], 'Benutzer');

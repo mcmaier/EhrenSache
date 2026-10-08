@@ -253,8 +253,10 @@ test('buildMembers beendet den Zeitraum genau bei den inaktiven Mitgliedern', fu
     $m      = buildMembers(new DemoRandom(20260908));
     $closed = array_filter($m['membership_dates'], fn ($d) => $d['end_date'] !== null);
     assertSame(3, count($closed));
-    foreach ($closed as $d) {
-        assertSame('inactive', $d['status']);
+    // Ein beendeter Zeitraum ist die Zeit, in der das Mitglied aktiv WAR --
+    // Status inactive hiesse seit OI-130 "in diesem Zeitraum inaktiv".
+    foreach ($m['membership_dates'] as $d) {
+        assertSame('active', $d['status']);
     }
 });
 
