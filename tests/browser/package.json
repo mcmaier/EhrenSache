@@ -7,7 +7,8 @@
     "click-through": "node click-through.mjs",
     "startup-chain": "node startup-chain.mjs",
     "cache-reuse": "node cache-reuse.mjs",
-    "ics-check": "node ics-check.mjs"
+    "ics-check": "node ics-check.mjs",
+    "pwa-offline": "node pwa-offline.mjs"
   },
   "dependencies": {
     "ical.js": "^2.2.1",

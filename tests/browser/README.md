@@ -90,3 +90,18 @@ CRLF (RFC 5545, 3.1).
 
 Braucht in `tests/config.php` die Konten `admin` und `user` (mit verknüpftem Mitglied) und die
 Tabelle `calendar_feeds`. `ES_BASE_URL` überschreibt `base_url`. Rückgabewert 1 bei jedem Fehler.
+
+### pwa-offline.mjs
+
+`pwa-offline.mjs` prüft den App-Rahmen der Check-in-PWA (OI-43, Stufe 1) in einem echten Chrome mit
+frischem Profil: Anmeldung als `user`, Service Worker übernimmt (ohne automatisches Neuladen), Speicher
+`checkin-<Version>` existiert. Offline lädt die App aus dem Speicher (`./`, `index.html`, Rückmelde-Link)
+und der Startbildschirm meldet „Server nicht erreichbar.“. Danach wird eine neue Version simuliert: Die
+Hinweisleiste erscheint, „Neu laden“ lädt genau einmal neu, und es bleibt nur der neue Speicher.
+
+    node tests/browser/pwa-offline.mjs      (oder: cd tests/browser && npm run pwa-offline)
+
+Das Skript überschreibt `public/checkin/service-worker.js` vorübergehend (andere `VERSION`) und schreibt
+die Datei im `finally` zurück; `git status` danach prüfen. `base_url` in `tests/config.php` (oder
+`ES_BASE_URL`) muss auf denselben Arbeitsbaum zeigen, in dem das Skript liegt. Braucht das Konto `user`.
+Rückgabewert 1 bei jedem Fehler.
