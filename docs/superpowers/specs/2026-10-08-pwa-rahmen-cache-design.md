@@ -23,9 +23,10 @@ Daten werden **nicht** zwischengespeichert (Stufe 2), Schreibaktionen ohne Netz 
 - `const VERSION = '<Version>'`; Speichername `checkin-<VERSION>`.
 - Vorladeliste, **relativ zum Service Worker**, nie mit führendem `/` (daran scheiterte die
   Zwischenspeicherung 2025):
-  `./`, `index.html`, `css/style.css?v=<VERSION>`, `js/app.js?v=<VERSION>`, `manifest.json`,
+  `index.html`, `css/style.css?v=<VERSION>`, `js/app.js?v=<VERSION>`, `manifest.json`,
   `icon-192.png`, `icon-512.png`, `icon-maskable-192.png`, `icon-maskable-512.png`,
   `apple-touch-icon.png`, `../js/vendor/html5-qrcode.min.js`, `../assets/logo-default.png`.
+  `./` steht nicht in der Liste: Ein Seitenaufruf auf `./` bekommt im `fetch`-Handler die gespeicherte `index.html`.
   Die `?v=`-Einträge entstehen aus `VERSION` und treffen damit genau die Anfragen aus
   `index.html`.
 - **install:** alles vorladen (`cache.addAll`). Scheitert eine Datei, scheitert die
