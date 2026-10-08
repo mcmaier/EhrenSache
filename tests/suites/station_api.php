@@ -1391,16 +1391,33 @@ test('auto_checkin: Stichtag ist das Datum der arrival_time, nicht heute (OI-103
     // Check-in um 03:17 ein, und der Test wurde rot, obwohl die Aktivpruefung
     // stimmte. Deshalb Toleranz 0 und eine Ankunft mit krummen Sekunden --
     // treffen koennte nur ein Termin, der auf die Sekunde genau dann beginnt.
+    //
+    // Seit ein Geraet hoechstens das Toleranzfenster zurueck stempeln darf
+    // (checkin_server_time.php), gibt es eine Ankunft von gestern nur noch
+    // kurz nach Mitternacht: Mit tolerance_hours 8 reicht 23:59:43 bis 07:59
+    // zurueck. Spaeter am Tag ist der Fall nicht herstellbar -- dann prueft
+    // der Test die Gegenrichtung, dass der Eintrag an der Zeitgrenze scheitert
+    // und nicht an der Aktivpruefung.
+    $gestern = date('Y-m-d', strtotime('-1 day')) . ' 23:59:43';
+    $erreichbar = time() - strtotime($gestern) < 8 * 3600;
     $before = apiRequest('GET', 'settings', ['token' => apiToken('admin')]);
     $prev   = (string) ($before['body']['settings']['checkin_auto_create_appointment'] ?? '1');
     stationSetSetting('checkin_auto_create_appointment', '0');
     try {
         oi27WithMember([date('Y-m-d', strtotime('-2 years')), date('Y-m-d', strtotime('-1 day'))],
-            function (string $nummer) {
-                $res = terminalCheckin($nummer, date('Y-m-d', strtotime('-1 day')) . ' 03:17:43',
-                    ['tolerance_hours' => 0]);
-                assertStatus(409, $res, 'Am Tag der Ankunft war das Mitglied aktiv: ' . $res['raw']);
-                assertSame('no_matching_appointment', $res['body']['reason'] ?? null);
+            function (string $nummer) use ($gestern, $erreichbar) {
+                $res = terminalCheckin($nummer, $gestern, ['tolerance_hours' => 8]);
+                if (!$erreichbar) {
+                    assertStatus(400, $res, 'Zu alt fuer das Fenster: ' . $res['raw']);
+                    assertSame('arrival_time_out_of_range', $res['body']['reason'] ?? null);
+                    return;
+                }
+                // Toleranz 8 h statt 0: Die automatische Suche kann einen Termin
+                // treffen; dann 201 statt 409. Beides heisst: aktiv am Ankunftstag.
+                assertTrue(in_array($res['status'], [200, 201, 409], true),
+                    'Am Tag der Ankunft war das Mitglied aktiv: ' . $res['raw']);
+                assertTrue(($res['body']['reason'] ?? null) !== 'member_inactive',
+                    'Stichtag muss das Ankunftsdatum sein, nicht heute');
             });
     } finally {
         stationSetSetting('checkin_auto_create_appointment', $prev);

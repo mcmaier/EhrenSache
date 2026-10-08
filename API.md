@@ -1614,13 +1614,29 @@ Sucht passenden Termin im Zeitfenster. Kann automatisch einen neuen Termin anleg
 }
 ```
 
-**Response (Erfolg, 201 — neu angelegt):** kein `success`, kein `appointment_title`, kein
-`arrival_time` im Wurzelobjekt — die Termindaten stecken verschachtelt in `appointment`:
+**Wessen Uhr gilt (seit 1.22.2):** `arrival_time` ist **optional**. Fehlt sie, stempelt der
+Server mit seiner Uhr. Ob ein mitgeschickter Wert wirkt, hängt am Konto:
+
+| Konto | `arrival_time` aus dem Request |
+|---|---|
+| `user` (eigenes Mitglied) | **wirkt nicht** — immer die Serveruhr |
+| Gerät (`auth_device`, `totp_location`) | wirkt, aber nur bis `checkin_tolerance_hours` zurück (mindestens 10 Minuten) und höchstens 5 Minuten voraus; sonst `400 arrival_time_out_of_range`. Gedacht für die Offline-Warteschlange eines Terminals |
+| `admin`, `manager` | wirkt ohne Grenze — sie schreiben Anwesenheiten ohnehin über `records` |
+
+Über `totp_checkin` gilt immer die Serveruhr, gleich welches Konto. Bis 1.22.1 wurde der Wert
+von jedem Konto übernommen, und Tagesgrenze wie Toleranzfenster rechneten gegen ihn.
+
+Dasselbe gilt für `tolerance_hours` im Request (0–8): Er wirkt seit 1.22.2 nur noch für
+Geräte, sonst gilt die Einstellung `checkin_tolerance_hours`.
+
+**Response (Erfolg, 201 — neu angelegt):** kein `success`, kein `appointment_title` — die
+Termindaten stecken verschachtelt in `appointment`:
 ```json
 {
   "message": "Check-in successful",
   "record_action": "created",
   "record_id": 42,
+  "arrival_time": "2024-03-15 19:05:32",
   "appointment_id": 10,
   "member_id": 5,
   "checkin_source": "device_auth",
@@ -1646,6 +1662,9 @@ zusätzlich `is_auto_created: 1`). Andere Werte gibt es nicht.
 successful" (`201`); ein vorhandener Datensatz wird übernommen → `"updated"` / „Check-in
 updated" (`200`), oder bleibt stehen (spätere Ankunft, kein Ersatz) → `"unchanged"` / „Check-in
 unchanged" (`200`). `warning` steht nur bei `201` im Objekt (auch wenn `null`).
+
+`arrival_time` (seit 1.22.2) ist die Ankunft, die der Datensatz nach dem Aufruf trägt — bei
+`"unchanged"` also die frühere, gespeicherte Zeit, nicht die dieses Aufrufs.
 
 **Ort bei Geräten (OI-102):** Ruft ein Gerätekonto auf, ist `location_name` der Gerätename —
 wie am Kiosk. Bis dahin stand dort `users.email`, und weil Geräte keine E-Mail haben, war der
@@ -1678,13 +1697,14 @@ Kein `success`-Feld; `message`, `reason` und `hint` sind die tatsächlichen Feld
 
 | Feld | Typ | Pflicht | Beschreibung |
 |---|---|---|---|
-| `appointment_id` | int | nein | Bewusst gewählter Termin. Muss am selben Tag wie `arrival_time` liegen und für die Gruppen des Mitglieds zugelassen sein. Ohne Angabe sucht der Server im Toleranzfenster. |
+| `appointment_id` | int | nein | Bewusst gewählter Termin. Muss am selben Tag wie die Ankunft liegen und für die Gruppen des Mitglieds zugelassen sein. Ohne Angabe sucht der Server im Toleranzfenster. |
 
 **Antworten (seit 1.2.4):**
 
 | Status | `reason` | Bedeutung |
 |---|---|---|
 | `201` / `200` | – | Check-in angelegt oder aktualisiert |
+| `400` | `arrival_time_out_of_range` | Nur Geräte: `arrival_time` liegt außerhalb des zulässigen Zeitraums (seit 1.22.2) |
 | `403` | `appointment_not_permitted` | Termin gehört zu einer anderen Gruppe |
 | `404` | – | `"Member not found"`: Nummer bzw. `member_id` unbekannt |
 | `404` | `member_inactive` | Nur Gerätekonten: Mitglied am Tag der Ankunft nicht aktiv (OI-103) |
@@ -1704,8 +1724,8 @@ sich für einen beliebigen Termin desselben Tages einchecken, unabhängig von de
 Uhrzeit.
 
 **Seit 1.3.0:** `record_id`, `member_id` und `appointment_id` sind in den Antworten JSON-Zahlen
-(zuvor teils Strings). Der gespeicherte `arrival_time` ist die normalisierte `Y-m-d H:i:s`-Form
-des Request-Werts — ein ISO-Input mit `T` (z. B. `2026-09-04T19:05:32`) wird ebenso
+(zuvor teils Strings). Wo der Request-Wert wirkt (Gerät, Verwalter), wird `arrival_time` als
+`Y-m-d H:i:s` gespeichert — ein ISO-Input mit `T` (z. B. `2026-09-04T19:05:32`) wird ebenso
 normalisiert wie das PWA-Format.
 
 ---
@@ -1726,10 +1746,13 @@ Wird automatisch für Authorisierten User durchgeführt (z.B. User über PWA).
 ```json
 {
   "totp_code": "123456",
-  "arrival_time": "2024-03-15 19:05:32",
   "source_device": "user_totp"
 }
 ```
+
+Seit 1.22.2 stempelt ein TOTP-Check-in **immer** mit der Serveruhr: Der Code belegt, dass
+jemand die Station jetzt sieht. `arrival_time` ist nicht mehr Pflicht; wer sie weiter schickt
+(die Check-in-App bis 1.22.1), wird nicht abgewiesen, der Wert wirkt aber nicht.
 
 **Response (gültiger Code):** Ein gültiger Code ruft intern `handleAutoCheckin()` auf — die
 Antwort ist **identisch** mit der des Auto-Check-In (siehe oben), inklusive `message`,
@@ -1749,7 +1772,7 @@ Antwort ist **identisch** mit der des Auto-Check-In (siehe oben), inklusive `mes
 
 | Status | Bedingung | `message` |
 |---|---|---|
-| `400` | `totp_code` oder `arrival_time` fehlt | „totp_code and arrival_time are required" (mit `example`) |
+| `400` | `totp_code` fehlt | „totp_code is required" (mit `example`) |
 | `400` | `totp_code` ist nicht genau 6 Ziffern | „Ungültiges Code-Format" |
 | `400` | keine TOTP-Station konfiguriert | „Keine TOTP-Stationen konfiguriert." |
 
@@ -4224,7 +4247,7 @@ async function getMembers() {
 
 // member_id/appointment_id werden NICHT mitgeschickt — die Zuordnung läuft
 // serverseitig über die TOTP-Auflösung (totp_checkin.php:31-44).
-async function checkIn(totpCode, arrivalTime) {
+async function checkIn(totpCode) {
   const response = await fetch(`${API_BASE}?resource=totp_checkin`, {
     method: 'POST',
     headers: {
@@ -4233,7 +4256,6 @@ async function checkIn(totpCode, arrivalTime) {
     },
     body: JSON.stringify({
       totp_code: totpCode,
-      arrival_time: arrivalTime,
       source_device: 'web-scanner-1'
     })
   });
@@ -4266,10 +4288,9 @@ def get_members():
 
 # member_id/appointment_id werden NICHT mitgeschickt — die Zuordnung läuft
 # serverseitig über die TOTP-Auflösung (totp_checkin.php:31-44).
-def check_in(totp_code, arrival_time):
+def check_in(totp_code):
     data = {
         'totp_code': totp_code,
-        'arrival_time': arrival_time,
         'source_device': 'iot-scanner-1'
     }
     
@@ -4295,7 +4316,7 @@ const char* API_TOKEN = "your_api_token_here";
 
 // member_id/appointment_id werden NICHT mitgeschickt — die Zuordnung läuft
 // serverseitig über die TOTP-Auflösung (totp_checkin.php:31-44).
-bool checkIn(String totpCode, String arrivalTime) {
+bool checkIn(String totpCode) {
   HTTPClient http;
   
   String url = String(API_BASE) + "?resource=totp_checkin";
@@ -4306,7 +4327,6 @@ bool checkIn(String totpCode, String arrivalTime) {
   
   StaticJsonDocument<200> doc;
   doc["totp_code"] = totpCode;
-  doc["arrival_time"] = arrivalTime;
   doc["source_device"] = "esp32-scanner-1";
   
   String jsonData;

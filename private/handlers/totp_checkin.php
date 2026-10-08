@@ -28,13 +28,15 @@ function handleTotpCheckin($db, $database, $request_method, $authUserId, $authUs
     $data = json_decode(file_get_contents("php://input"));
 
     // Validierung
-    if(!isset($data->totp_code) || !isset($data->arrival_time)) {
+    // arrival_time ist nicht mehr Pflicht und wirkt nicht: Ein TOTP-Check-in
+    // stempelt immer mit der Serveruhr (resolveCheckinArrival() in
+    // auto_checkin.php). Der Code belegt die Anwesenheit jetzt, nicht frueher.
+    if(!isset($data->totp_code)) {
         http_response_code(400);
         echo json_encode([
-            "message" => "totp_code and arrival_time are required",
+            "message" => "totp_code is required",
             "example" => [
-                "totp_code" => "123456",
-                "arrival_time" => "2025-12-05 18:15:00"
+                "totp_code" => "123456"
             ]
         ]);
         return;

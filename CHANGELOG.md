@@ -50,10 +50,22 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   (`tests/suites/html_sinks_frontend.php`), der jetzt auch Werten folgt, die per `join()` oder
   `+`-Verkettung zusammengesetzt werden.
 
-## [1.22.1]
+## [1.22.2] – 2026-10-08
 
+### Sicherheit
+- **Ein Mitglied kann sich nicht mehr rückwirkend als anwesend eintragen.** Der Check-in
+  übernahm die Ankunftszeit, die der Aufrufer mitschickte, und prüfte Tag und Zeitfenster gegen
+  genau diesen Wert. Ein angemeldetes Konto mit Rolle `user` konnte sich so für jeden
+  vergangenen Termin seiner Gruppe als anwesend und pünktlich eintragen — über den TOTP-Weg
+  sogar mit Ortsnachweis, sobald es einen gerade gültigen Code kannte. Mitglieder und jeder
+  TOTP-Check-in stempeln jetzt mit der Uhr des Servers; `arrival_time` ist dort nicht mehr
+  Pflicht und wirkt nicht. Geräte dürfen ihre Zeit weiter mitschicken (Offline-Warteschlange
+  des Terminals), aber nur innerhalb des Toleranzfensters zurück und höchstens fünf Minuten
+  voraus. Ebenso wirkt `tolerance_hours` aus dem Request nur noch für Geräte. Die Antwort
+  enthält jetzt `arrival_time`. Betroffen waren alle bisherigen Versionen. Siehe Advisory
+  GHSA-vmrc-3c9f-mfgv.
 
- – 2026-10-06
+## [1.22.1] – 2026-10-06
 
 ### Geändert
 - **CSS, JS und HTML kommen komprimiert an.** `public/.htaccess` schaltet gzip für statische

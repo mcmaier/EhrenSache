@@ -140,12 +140,19 @@ test('checkin_tolerance_hours steuert die Dublettenpruefung der Termine', functi
     });
 });
 
-/** Check-in als Rolle 'user' auf die eigene member_id. */
+/**
+ * Check-in als Admin fuer das Mitglied der Rolle user.
+ *
+ * Bis 1.22.1 lief das als Rolle user selbst. Die Tests brauchen aber feste
+ * Uhrzeiten, und seither stempelt ein Mitglied immer mit der Serveruhr
+ * (checkin_server_time.php). Termin-, Gruppen- und Toleranzpruefung gelten fuer
+ * alle Rollen gleich und beziehen sich auf das Mitglied, nicht auf das Konto.
+ */
 function ciCheckin(array $body): array
 {
     return apiRequest('POST', 'auto_checkin', [
-        'token' => apiToken('user'),
-        'body'  => $body,
+        'token' => apiToken('admin'),
+        'body'  => $body + ['member_id' => apiMemberId('user')],
     ]);
 }
 
