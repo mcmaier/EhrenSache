@@ -9,6 +9,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [1.22.2] – 2026-10-08
+
 ### Sicherheit
 - **Ein Mitglied kann sich nicht mehr rückwirkend als anwesend eintragen.** Der Check-in
   übernahm die Ankunftszeit, die der Aufrufer mitschickte, und prüfte Tag und Zeitfenster gegen
