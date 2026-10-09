@@ -12,6 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall } from './api.js';
 import { debug } from '../app.js'
 import { getAuthHeaders } from './api.js';
+import { resetSessionTimeout } from './auth.js';
 import { showToast, invalidateCache, refreshYearFilters, dataCache } from './ui.js';
 import { loadAppointments } from './appointments.js';
 import { showRecordsSection } from './records.js';
@@ -52,6 +53,7 @@ export function exportMembers() {
     })
     .then(response => {
         if (!response.ok) throw new Error('Export failed');
+        resetSessionTimeout();
         return response.blob();
     })
     .then(blob => {
@@ -84,6 +86,7 @@ export function exportAppointments() {
         // Ohne diese Prüfung wird der Fehlerkörper zum Blob und landet als
         // .csv-Datei mit JSON darin auf der Platte — genau das Bild aus OI-24.
         if (!response.ok) throw new Error('Export failed');
+        resetSessionTimeout();
         return response.blob();
     })
     .then(blob => {
@@ -114,6 +117,7 @@ export function exportRecords() {
     })
     .then(response => {
         if (!response.ok) throw new Error('Export failed');
+        resetSessionTimeout();
         return response.blob();
     })
     .then(blob => {
@@ -216,6 +220,7 @@ export async function executeImport() {
             debug.error('Import error response:', errorText);
             throw new Error(`Import failed: ${response.status}`);
         }
+        resetSessionTimeout();
         
         const result = await response.json();
 
@@ -435,6 +440,7 @@ export async function executeRecordsImport() {
             debug.error('Import error response:', errorText);
             throw new Error(`Import failed: ${response.status}`);
         }
+        resetSessionTimeout();
         
         const result = await response.json();
 
@@ -549,6 +555,7 @@ export async function analyzeCsvForAppointments() {
             debug.error('Import error response:', errorText);
             throw new Error(`Import failed: ${response.status}`);
         }
+        resetSessionTimeout();
         
         result = await response.json();
 
@@ -751,6 +758,7 @@ export async function executeAppointmentsImport() {
             debug.error('Import error response:', errorText);
             throw new Error(`Import failed: ${response.status}`);
         }
+        resetSessionTimeout();
         
         const result = await response.json();
 

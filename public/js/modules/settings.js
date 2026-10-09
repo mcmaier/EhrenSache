@@ -10,6 +10,7 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdmin } from './api.js';
+import { resetSessionTimeout } from './auth.js';
 import { showConfirm, showToast, dataCache, updateSubgroupLabelElements, invalidateCache, resetClientSettings } from './ui.js';
 import { escapeHtml } from './utils.js';
 import { registerActions } from './actions.js';
@@ -672,6 +673,7 @@ function setupLogoUpload() {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
+            resetSessionTimeout();
 
             const result = await response.json();
 

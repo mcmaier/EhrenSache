@@ -9,6 +9,21 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Behoben
+
+- **Dashboard: Abmeldung wegen Inaktivität nach Export, Import oder Logo-Upload.** Diese
+  Vorgänge laufen am gemeinsamen API-Aufruf vorbei und verlängerten nur die Sitzung auf dem
+  Server, nicht den Countdown oben rechts. Nach einem langen Import konnte das Dashboard
+  deshalb abmelden, obwohl die Sitzung noch lief. Sie setzen den Countdown jetzt ebenfalls
+  zurück.
+
+### Entfernt
+
+- Toter Code rund um den Sitzungs-Timeout: der nie gelesene Wert `SESSION_TIMEOUT` (eine
+  Stunde) samt Objekt `config` in `js/config.js` sowie das ungenutzte `checkAuth()` in
+  `modules/auth.js`, das eine nicht vorhandene `api/auth.php` abfragte. Maßgeblich bleiben
+  die 30 Minuten des Servers.
+
 ## [1.23.1] – 2026-10-09
 
 ### Behoben
