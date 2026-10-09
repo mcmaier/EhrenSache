@@ -9,6 +9,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [1.23.1] – 2026-10-09
+
 ### Behoben
 
 - **Check-in-App: Admins und Manager sahen fremde Tätigkeitsarten.** Die Auswahl der
@@ -23,7 +25,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Anwesenheitsliste, Station, Terminrückmeldungen und Kalender-Abo. Jetzt gilt: Ein inaktiver
   Zeitraum beendet oder unterbricht die Aktivität; gibt es aktive Zeiträume, muss der Tag in einem
   davon liegen. **Bestandsdaten prüfen:** Wer einen beendeten Zeitraum bisher als „Inaktiv“
-  markiert hat, um das Ende der Mitgliedschaft anzuzeigen, stellt ihn auf „Aktiv“ um.
+  markiert hat, um das Ende der Mitgliedschaft anzuzeigen, stellt ihn auf „Aktiv“ um. Der
+  Update-Assistent nennt die Mitglieder, bei denen das zutreffen kann (aktiv in den Stammdaten,
+  beendeter Zeitraum „Inaktiv“, kein Zeitraum „Aktiv“), und ändert selbst nichts.
 - **Mitgliederliste zeigt aktiv/inaktiv tagesgenau.** Bisher galt ein Mitglied als aktiv, wenn es
   irgendwann im gewählten Jahr aktiv war; ein im September beendeter Zeitraum stand bis
   Jahresende als „Aktiv“ da. Spalte, Hervorhebung und Filter „Aktiv/Inaktiv“ zeigen jetzt den

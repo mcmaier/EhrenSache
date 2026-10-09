@@ -300,4 +300,10 @@ return [
         'file'     => '1.22.2.php',
         'function' => 'migrate_1_22_2',
     ],
+    [
+        'from'     => '1.23.0',
+        'to'       => '1.23.1',
+        'file'     => '1.23.0.php',
+        'function' => 'migrate_1_23_0',
+    ],
 ];

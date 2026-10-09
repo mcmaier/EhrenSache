@@ -7,7 +7,7 @@ oder noch nicht gebaut.
 **Zuletzt geprüft:** 2026-09-28 gegen `v1.17.1` (`8d77479`), Eintrag für Eintrag gegen Code und git ·
 **Status nachgezogen:** 2026-10-01 gegen `v1.19.0` (`d672b8d`) — nur Veröffentlichungsvermerke und
 Kopfzeilen gegen git, **nicht** Eintrag für Eintrag gegen den Code ·
-**Version:** 1.23.0
+**Version:** 1.23.1
 
 > **Diese Angabe ist Teil der Pflege, nicht Zierde.** Am 2026-09-17 stand hier noch 1.7.0,
 > während der Code auf 1.9.0 war — fünf Punkte waren längst behoben, ohne dass ihr Eintrag es
@@ -1029,8 +1029,8 @@ Offenlegung in `DATENSCHUTZ.md`, eigener Server als Abhängigkeit). Nur als Grun
 ---
 
 ### OI-130 · Status „Inaktiv“ der Mitgliedschaftszeiträume wirkte nicht
-**Priorität:** mittel · aufgenommen und behoben am 2026-10-08 (Zweig `fix/aktivzeitraum-status`,
-noch nicht veröffentlicht)
+**Priorität:** erledigt mit 1.23.1 (2026-10-09) · aufgenommen und behoben am 2026-10-08 (Zweig
+`fix/aktivzeitraum-status`)
 
 **Befund:** Der Mitglieds-Dialog bietet je Zeitraum „Aktiv“ oder „Inaktiv“, gespeichert in
 `membership_dates.status`. Keine Abfrage las die Spalte — jeder Zeitraum wirkte wie ein aktiver.
@@ -1048,12 +1048,14 @@ Auswahllisten bleiben bei „im Jahr aktiv“ (`is_active_in_period`), damit rü
 kann. Die Kopie der Jahresregel in `members.php` ist entfernt. Wächter:
 `tests/suites/member_activity_api.php`, Kiosk-Fall in `station_unit.php`.
 
-**Offen für das Release — Bestandsdaten:** Wer bisher einen *beendeten* Zeitraum als „Inaktiv“
+**Bestandsdaten:** Wer bisher einen *beendeten* Zeitraum als „Inaktiv“
 markiert hat (so tat es auch der Demo-Datengenerator, jetzt korrigiert), meinte „war aktiv von–bis“.
 Nach der neuen Regel heißt derselbe Eintrag „war inaktiv von–bis“; hat das Mitglied keinen
 weiteren aktiven Zeitraum und steht `members.active` auf 1, gilt es danach wieder als aktiv.
-Zu entscheiden: nur im Changelog darauf hinweisen oder einen Migrationsschritt, der solche
-Einträge meldet (nicht still umdeutet). Ist `members.active = 0`, ändert sich nichts.
+Ist `members.active = 0`, ändert sich nichts. **Entschieden 2026-10-08 (Variante b):** Der
+Migrationsschritt 1.23.0 → 1.23.1 (`membershipStatusCheck()` in
+`private/helpers/membership_status_check.php`) nennt solche Mitglieder im Update-Assistenten als
+Warnung und ändert nichts; der Verein prüft selbst.
 
 **Nicht sicherheitsrelevant.**
 

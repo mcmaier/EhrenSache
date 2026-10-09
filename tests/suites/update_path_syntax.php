@@ -35,6 +35,7 @@ const UPDATE_PATH_FILES = [
     'private/helpers/subgroup_parent.php',
     'private/helpers/group_history.php',
     'private/helpers/calendar_feed_schema.php',
+    'private/helpers/membership_status_check.php',
 ];
 
 /** Liste der gefundenen Konstrukte nach PHP 8.0 als "Konstrukt (Zeile n)". */
