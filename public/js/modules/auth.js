@@ -11,7 +11,6 @@
 import { apiCall, setCsrfToken} from './api.js';
 import { showToast } from './ui.js';
 import { debug } from '../app.js';
-import { registerActions } from './actions.js';
 
 // ============================================
 // AUTH
@@ -19,55 +18,12 @@ import { registerActions } from './actions.js';
 // import {} from './auth.js'
 // ============================================
 
-let apiFailureCount = 0;
-const MAX_API_FAILURES = 3;
-
 let sessionTimeoutInterval = null;
 let lastActivityTime = null;
 //const SESSION_DURATION = 30000; // Test: 30 Sekunden
 const SESSION_DURATION = 30 * 60 * 1000; // 30 Minuten
-const INACTIVITY_WARNING = 5 * 60 * 1000; // Warnung nach 25 Min Inaktivität
+const INACTIVITY_WARNING = 5 * 60 * 1000; // Warnung 5 Min vor Ablauf
 
-
-// In checkAuth() Funktion anpassen:
-export async function checkAuth() {
-    try {
-        const response = await fetch('/api/auth.php?action=check_session');
-        
-        if (!response.ok) {
-            apiFailureCount++;
-            
-            if (apiFailureCount >= MAX_API_FAILURES) {
-                // API komplett down - Fehlerseite anzeigen
-                document.body.innerHTML = `
-                    <div style="display: flex; align-items: center; justify-content: center; 
-                                height: 100vh; flex-direction: column; font-family: system-ui;">
-                        <h1>? Verbindungsfehler</h1>
-                        <p>Die API ist nicht erreichbar. Bitte sp�ter erneut versuchen.</p>
-                        <button data-action="auth-reload"
-                                style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">
-                            Neu laden
-                        </button>
-                    </div>
-                `;
-                return null;
-            }
-            
-            throw new Error('API nicht erreichbar');
-        }
-        
-        const data = await response.json();
-        
-        // Bei Erfolg Counter zur�cksetzen
-        apiFailureCount = 0;
-        
-        return data.authenticated ? data : null;
-        
-    } catch (error) {
-        console.error('Auth check failed:', error);
-        return null;
-    }
-}
 
 // ============================================
 // LOGOUT
@@ -204,6 +160,3 @@ export function stopSessionTimeout() {
         document.removeEventListener(event, handleUserActivity);
     });
 }
-registerActions({
-    'auth-reload': () => location.reload(),
-});

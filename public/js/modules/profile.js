@@ -9,6 +9,7 @@
  */
 
 import { apiCall, currentUser } from './api.js';
+import { resetSessionTimeout } from './auth.js';
 import { showToast, showConfirm, dataCache, invalidateCache, loadClientSettings, loadOwnMember } from './ui.js';
 import { loadUserData } from './users.js';
 import { isFeatureOn } from './features.js';
@@ -327,6 +328,7 @@ export async function downloadMyData(format = 'json') {
             if(!response.ok) {
                 throw new Error('Export fehlgeschlagen');
             }
+            resetSessionTimeout();
             
             // Datei herunterladen
             const blob = await response.blob();

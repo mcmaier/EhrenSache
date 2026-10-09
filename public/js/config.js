@@ -42,10 +42,6 @@ function getApiBase() {
 // Konfiguration
 export const API_BASE = getApiBase();
 export const TOAST_DURATION = 3000;
-export const SESSION_TIMEOUT = 3600000;
-
-export const config = {
-    apiBase: API_BASE,
-    toastDuration: TOAST_DURATION,
-    sessionTimeout: SESSION_TIMEOUT
-};
+// Die Inaktivitaetsgrenze steht nicht hier: Massgeblich ist der Server
+// (SESSION_TIMEOUT_SECONDS in api/api.php), der Countdown im Dashboard
+// spiegelt ihn in SESSION_DURATION (modules/auth.js).
